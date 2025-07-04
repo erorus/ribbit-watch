@@ -7,6 +7,8 @@ const git = new (require('./git'))(gitDir);
 const gitWatcher = new (require('./gitWatcher'))(gitDir);
 const ribbitVersions = require('./ribbitVersions');
 
+const BACKLOG_COMMITS = 50;
+
 /**
  * @typedef {Object} FileChanges
  * @property {string}            product
@@ -19,8 +21,54 @@ const ribbitVersions = require('./ribbitVersions');
  * @property {string}        commitHash
  * @property {number}        sequence
  * @property {number}        timestamp
- * @property {FileChanges[]} updates
+ * @property {FileChanges[]} changes
  */
+
+/**
+ * Builds a new update message object for the changes in the given git ref.
+ *
+ * @param {string} ref
+ * @returns {Promise<UpdateMessage>}
+ */
+async function buildMessage(ref) {
+    /** @type {UpdateMessage} */
+    const msg = {
+        commitHash: null,
+        sequence: null,
+        timestamp: null,
+        changes: [],
+    };
+
+    await Promise.all([
+        (async () => msg.commitHash = await git.getCommit(ref))(),
+        (async () => msg.sequence = ribbitVersions.getSequenceNumber(await git.getFile(ref, 'summary')))(),
+        (async () => msg.timestamp = await git.getTime(ref))(),
+        (async () => msg.changes = await getChanges(ref))(),
+    ]);
+
+    return msg;
+}
+
+/**
+ * Returns the most recent BACKLOG_COMMITS messages up to and including HEAD.
+ *
+ * @returns {Promise<UpdateMessage[]>}
+ */
+async function getBacklog() {
+    /** @type UpdateMessage[] */
+    const result = [];
+
+    const curCommit = await git.getCommit();
+
+    const promises = [];
+    for (let x = 0; x < BACKLOG_COMMITS; x++) {
+        promises.push((async () => result.push(await buildMessage(`${curCommit}~${x}`)))());
+    }
+
+    await Promise.all(promises);
+
+    return result;
+}
 
 /**
  * Prints a message to the log.
@@ -38,13 +86,13 @@ function logMsg(message) {
  * @param {string} ref
  * @returns {Promise<FileChanges[]>}
  */
-async function processCommit(ref = 'HEAD') {
+async function getChanges(ref = 'HEAD') {
     /** @type {FileChanges[]} */
     const results = [];
     const paths = (await git.getChangedFiles(ref)).filter(path => path.startsWith('products/'));
 
     await Promise.all(paths.map(async (path) => {
-        const logMessages = [`Processing ${path}`];
+        const logMessages = [`Processing ${ref} ${path}`];
         const pathParts = path.split('/');
 
         let prevLines = {};
@@ -76,26 +124,29 @@ async function processCommit(ref = 'HEAD') {
 }
 
 async function main() {
-    logMsg('Starting...');
+    logMsg('Filling backlog.');
+    const backlog = await getBacklog();
+    const sortBacklog = () => backlog.sort((a, b) => a.sequence - b.sequence);
+    sortBacklog();
+
     await gitWatcher.watchHead(async (commit) => {
         logMsg(`Detected new commit: ${commit}`);
 
-        const msg = {
-            commitHash: null,
-            sequence: null,
-            timestamp: null,
-            updates: [],
-        };
+        const shortCommit = await git.getCommit(commit);
 
-        await Promise.all([
-            (async () => msg.commitHash = await git.getCommit(commit))(),
-            (async () => msg.sequence = ribbitVersions.getSequenceNumber(await git.getFile(commit, 'summary')))(),
-            (async () => msg.timestamp = await git.getTime(commit))(),
-            (async () => msg.updates = await processCommit(commit))(),
-        ]);
+        if (backlog.find(message => message.commitHash === shortCommit)) {
+            logMsg(`Commit ${shortCommit} already processed.`);
+
+            return;
+        }
+
+        const msg = await buildMessage(shortCommit);
+        backlog.push(msg);
+        sortBacklog();
+        backlog.splice(0, backlog.length - BACKLOG_COMMITS);
 
         logMsg(msg);
-        //msg.updates.forEach(entry => logMsg(JSON.stringify(entry)));
+        //msg.changes.forEach(entry => logMsg(JSON.stringify(entry)));
     });
     logMsg('Watching for new commits...');
 }
