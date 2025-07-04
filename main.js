@@ -1,5 +1,7 @@
 const dateFormat = require('dateformat');
 const Path = require('node:path');
+const { createServer } = require('node:http');
+const { WebSocketServer } = require('ws');
 
 const gitDir = Path.join(__dirname, 'current', '.git');
 
@@ -8,6 +10,7 @@ const gitWatcher = new (require('./gitWatcher'))(gitDir);
 const ribbitVersions = require('./ribbitVersions');
 
 const BACKLOG_COMMITS = 50;
+const PORT = 8001;
 
 /**
  * @typedef {Object} FileChanges
@@ -129,6 +132,28 @@ async function main() {
     const sortBacklog = () => backlog.sort((a, b) => a.sequence - b.sequence);
     sortBacklog();
 
+    logMsg('Starting server.');
+    const server = createServer()
+    const wss = new WebSocketServer({ server });
+    wss.on('connection', ws => {
+        ws.on('error', message => logMsg(`WebSocket error: ${message}`));
+        ws.on('pong', () => void (ws.isAlive = true));
+        backlog.forEach(message => ws.send(JSON.stringify(message)));
+    });
+    const pingInterval = setInterval(() => {
+        wss.clients.forEach(ws => {
+            if (ws.isAlive === false) {
+                return ws.terminate();
+            }
+
+            ws.isAlive = false;
+            ws.ping();
+        });
+    }, 30000);
+    wss.on('close', () => clearInterval(pingInterval));
+    server.listen(PORT, () => logMsg(`Server started on port ${PORT}.`));
+
+    logMsg('Watching for new commits.');
     await gitWatcher.watchHead(async (commit) => {
         logMsg(`Detected new commit: ${commit}`);
 
@@ -146,9 +171,10 @@ async function main() {
         backlog.splice(0, backlog.length - BACKLOG_COMMITS);
 
         logMsg(msg);
-        //msg.changes.forEach(entry => logMsg(JSON.stringify(entry)));
+        wss.clients.forEach(ws => ws.send(JSON.stringify(msg)));
     });
-    logMsg('Watching for new commits...');
+
+    logMsg('Ready.');
 }
 
 main();
