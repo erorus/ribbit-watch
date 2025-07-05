@@ -32,15 +32,16 @@
             vertical-align: top;
         }
         .updates-list td, .updates-list div {overflow: hidden; text-overflow: ellipsis}
-        .updates-list td:nth-child(1) {width: 135px}
-        .updates-list td:nth-child(2) {width: 180px}
-        .updates-list td:nth-child(3) {width: 180px}
-        .updates-list td:nth-child(4) {width: 135px}
-        .updates-list td:nth-child(5) {width: 270px}
+        .updates-list td:nth-child(1) {width: 25%}
+        .updates-list td:nth-child(2) {width: 25%}
+        .updates-list td:nth-child(3) {width: 18%}
+        .updates-list td:nth-child(4) {width: 32%}
 
         .update-row-field-values-old {color: #666; font-weight: 300}
         .updates-list .hidden {display: none}
         .updates-list tr:hover .hidden {display: revert}
+
+        .updates-list-header {margin-bottom: 1em; text-align: right}
     </style>
     <script>
         (function () {
@@ -93,6 +94,8 @@
             function makeDate(timestamp) {
                 const shortFormatter = new Intl.DateTimeFormat([], {
                     weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
                     hour: 'numeric',
                     minute: '2-digit',
                 });
@@ -104,8 +107,8 @@
              * @param {UpdateMessage} updateMessage
              */
             function logChanges(updateMessage) {
-                const template = document.querySelector('#update-row');
-                const additions = document.createDocumentFragment();
+                const rowTemplate = document.querySelector('#update-row');
+                const rows = document.createDocumentFragment();
 
                 const prev = {};
                 const first = (key, value) => {
@@ -118,11 +121,8 @@
                 };
 
                 updateMessage.changes.forEach(change => change.diffs.forEach(diff => {
-                    const row = template.content.cloneNode(true);
+                    const row = rowTemplate.content.cloneNode(true);
                     const qs = row.querySelector.bind(row);
-                    qs('.update-row-timestamp').textContent = makeDate(updateMessage.timestamp);
-                    qs('.update-row-timestamp').classList.toggle('hidden', !first('time', updateMessage.timestamp));
-
                     qs('.update-row-product-product').textContent = change.product;
                     qs('.update-row-product-file').textContent = change.file !== 'versions' ? ` (${change.file})` : '';
                     qs('.update-row-product').classList.toggle('hidden', !first('prod', `${change.product}|${change.file}`));
@@ -134,15 +134,24 @@
                     qs('.update-row-field-values-new').textContent = diff.newValue || '\u00A0';
                     qs('.update-row-field-values-old').textContent = diff.oldValue || '\u00A0';
 
-                    additions.appendChild(row);
+                    rows.appendChild(row);
                 }));
 
-                if (!additions.hasChildNodes()) {
+                if (!rows.hasChildNodes()) {
                     return;
                 }
 
-                const table = ce('table', {className: 'updates-list'}, additions);
-                const surround = ce('div', {className: 'updates-list-container'}, table);
+                const surround = ce('div', {className: 'updates-list-container'});
+                {
+                    const header = document.querySelector('#update-header').content.cloneNode(true);
+                    header.querySelector('.updates-list-time').textContent = makeDate(updateMessage.timestamp);
+
+                    surround.appendChild(header);
+                }
+
+                const table = ce('table', {className: 'updates-list'}, rows);
+                surround.appendChild(table);
+
                 const listParent = document.querySelector('#updates-list-parent');
                 listParent.insertBefore(surround, listParent.firstChild);
             }
@@ -163,15 +172,19 @@
                 });
             }
 
-            main();
+            addEventListener('DOMContentLoaded', () => main());
         })();
     </script>
 </head>
 <body>
 <div id="updates-list-parent"></div>
+<template id="update-header">
+    <div class="updates-list-header">
+        <div class="updates-list-time"></div>
+    </div>
+</template>
 <template id="update-row">
     <tr class="update-row">
-        <td><span class="update-row-timestamp"></span></td>
         <td>
             <span class="update-row-product">
                 <span class="update-row-product-product"></span><span class="update-row-product-file"></span>
