@@ -75,20 +75,11 @@
         const rowTemplate = document.querySelector('#update-row');
         const rows = document.createDocumentFragment();
 
-        const prev = {};
-        const first = (key, value) => {
-            if (prev[key] === value) {
-                return false;
-            }
-            prev[key] = value;
-
-            return true;
-        };
-
         updateMessage.changes.forEach(change => change.diffs.forEach(diff => {
             const row = rowTemplate.content.cloneNode(true);
             const qs = row.querySelector.bind(row);
             qs('.update-row').dataset.product = change.product;
+            qs('.update-row').dataset.field = diff.field;
             qs('.update-row-product-product').textContent = change.product;
             qs('.update-row-product-product').href = `https://github.com/erorus-everynothing/ribbit/blob/${updateMessage.commitHash}/products/${change.product}/${change.file}`;
             qs('.update-row-product-file').textContent = change.file !== 'versions' ? ` (${change.file})` : '';
@@ -136,29 +127,10 @@
      */
     function filterSetup() {
         const productsBox = document.querySelector('#products-filter');
-        let origValue;
-        try {
-            origValue = localStorage.getItem('products') ?? '';
-            if (origValue !== '') {
-                productsBox.value = origValue;
-            }
-        } catch (e) {
-            console.log('Failed to get products from local storage.');
-        }
-        productsBox.addEventListener('input', () => {
-            updateFilters();
+        productsBox.addEventListener('input', () => updateFilters());
 
-            const value = productsBox.value.trim();
-            try {
-                if (value === '') {
-                    localStorage.removeItem('products');
-                } else {
-                    localStorage.setItem('products', value);
-                }
-            } catch (e) {
-                console.warn('Failed to update local storage', e);
-            }
-        });
+        document.querySelectorAll('.columns-filter')
+            .forEach(ele => ele.addEventListener('change', () => updateFilters()));
     }
 
     /**
@@ -201,11 +173,17 @@
      */
     function updateFilters(container) {
         const containers = container ? [container] : document.querySelectorAll('.updates-list-container');
+        const deniedFields = Array.from(document.querySelectorAll('.columns-filter'))
+            .filter(checkbox => !checkbox.checked)
+            .map(checkbox => checkbox.value);
 
         const productsRegex = getProductsRegex();
         containers.forEach(container => {
             container.querySelectorAll('.update-row[data-product]').forEach(row => {
-                row.classList.toggle('filtered', !productsRegex.test(row.dataset.product));
+                row.classList.toggle('filtered',
+                    !productsRegex.test(row.dataset.product) ||
+                    deniedFields.includes(row.dataset.field)
+                );
             });
 
             if (!container.querySelector('.update-row:not(.filtered)')) {

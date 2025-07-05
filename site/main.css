@@ -45,3 +45,7 @@ input[data-invalid] {background-color: #f88}
 
 a {text-decoration: none}
 a:hover {text-decoration: revert}
+
+.filter-container {padding-top: 0; padding-bottom: 0}
+.filter-container > div {display: flex; align-items: center; margin: 1em 0}
+.filter-container label {cursor: pointer; margin-right: 1em; user-select: none}

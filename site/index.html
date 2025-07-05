@@ -7,8 +7,24 @@
 </head>
 <body>
 <div class="filter-container">
-    <div style="display: flex; align-items: center">
+    <div>
         <span>Products:&nbsp;</span><input type="text" id="products-filter" style="flex: 1 0 auto" placeholder="wow wowt wowxptr wow_beta wow_classic*">
+    </div>
+    <div>
+        <span>Versions:&nbsp;</span>
+        <label><input type="checkbox" class="columns-filter" value="BuildConfig" CHECKED>BuildConfig</label>
+        <label><input type="checkbox" class="columns-filter" value="CDNConfig" CHECKED>CDNConfig</label>
+        <label><input type="checkbox" class="columns-filter" value="KeyRing" CHECKED>KeyRing</label>
+        <label><input type="checkbox" class="columns-filter" value="BuildId" CHECKED>BuildId</label>
+        <label><input type="checkbox" class="columns-filter" value="VersionsName" CHECKED>VersionsName</label>
+        <label><input type="checkbox" class="columns-filter" value="ProductConfig" CHECKED>ProductConfig</label>
+    </div>
+    <div>
+        <span>CDNs:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+        <label><input type="checkbox" class="columns-filter" value="Path" CHECKED>Path</label>
+        <label><input type="checkbox" class="columns-filter" value="Hosts" CHECKED>Hosts</label>
+        <label><input type="checkbox" class="columns-filter" value="Servers" CHECKED>Servers</label>
+        <label><input type="checkbox" class="columns-filter" value="ConfigPath" CHECKED>ConfigPath</label>
     </div>
 </div>
 <div id="updates-list-parent"></div>
