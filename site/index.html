@@ -3,27 +3,44 @@
 <head>
     <title>Ribbit Now</title>
     <style>
-        @font-face {
-            font-family: 'Less Perfect DOS VGA';
-            src: url('LessPerfectDOSVGA.ttf') format('truetype');
-            font-weight: normal;
-            font-style: normal;
-        }
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300..400&display=swap');
 
         body {
-            background-color: #111;
-            color: #aaa;
-            font-family: 'Less Perfect DOS VGA', monospace;
-            font-size: 1.6667vw;
-            margin: 1.6667vw;
+            background-color: #bbb;
+            color: #111;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 400;
+            font-style: normal;
+            font-size: 14px;
+            line-height: 1.33;
         }
 
-        #updates-list {border-collapse: collapse}
-        #updates-list tr:hover {background-color: #222}
-        #updates-list td {padding-right: 0.6667em; vertical-align: top}
-        .update-row-field-values-old {color: #777}
-        #updates-list .hidden {display: none}
-        #updates-list tr:hover .hidden {display: unset}
+        .updates-list-container {
+            background-color: #ddd;
+            border: 1px solid #111;
+            border-radius: 5px;
+            box-sizing: content-box;
+            margin: 1em auto;
+            padding: 1em;
+            width: 900px;
+        }
+        .updates-list {border-collapse: collapse; table-layout: fixed; width: 900px}
+        .updates-list tr:hover {background-color: #ccc}
+        .updates-list td {
+            box-sizing: border-box;
+            padding: 0;
+            vertical-align: top;
+        }
+        .updates-list td, .updates-list div {overflow: hidden; text-overflow: ellipsis}
+        .updates-list td:nth-child(1) {width: 135px}
+        .updates-list td:nth-child(2) {width: 180px}
+        .updates-list td:nth-child(3) {width: 180px}
+        .updates-list td:nth-child(4) {width: 135px}
+        .updates-list td:nth-child(5) {width: 270px}
+
+        .update-row-field-values-old {color: #666; font-weight: 300}
+        .updates-list .hidden {display: none}
+        .updates-list tr:hover .hidden {display: revert}
     </style>
     <script>
         (function () {
@@ -75,9 +92,8 @@
 
             function makeDate(timestamp) {
                 const shortFormatter = new Intl.DateTimeFormat([], {
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
+                    weekday: 'short',
+                    hour: 'numeric',
                     minute: '2-digit',
                 });
 
@@ -125,10 +141,10 @@
                     return;
                 }
 
-                additions.insertBefore(ce('tr', {}, ce('td', {}, document.createTextNode('\u00A0'))), additions.firstChild);
-
-                const list = document.querySelector('#updates-list');
-                list.insertBefore(additions, list.firstChild);
+                const table = ce('table', {className: 'updates-list'}, additions);
+                const surround = ce('div', {className: 'updates-list-container'}, table);
+                const listParent = document.querySelector('#updates-list-parent');
+                listParent.insertBefore(surround, listParent.firstChild);
             }
 
             function main() {
@@ -152,7 +168,7 @@
     </script>
 </head>
 <body>
-<table id="updates-list"></table>
+<div id="updates-list-parent"></div>
 <template id="update-row">
     <tr class="update-row">
         <td><span class="update-row-timestamp"></span></td>
