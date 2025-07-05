@@ -10,7 +10,10 @@ body {
     line-height: 1.33;
 }
 
-.updates-list-container {
+input {font-family: 'JetBrains Mono', monospace; font-weight: 300; font-style: normal; font-size: 14px}
+input[data-invalid] {background-color: #f88}
+
+.updates-list-container, .filter-container {
     background-color: #ddd;
     border: 1px solid #111;
     border-radius: 5px;
@@ -20,6 +23,7 @@ body {
     width: 900px;
 }
 .updates-list {border-collapse: collapse; table-layout: fixed; width: 900px}
+.filtered {display: none}
 .updates-list tr:hover {background-color: #ccc}
 .updates-list td {
     box-sizing: border-box;

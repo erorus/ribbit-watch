@@ -1,4 +1,7 @@
 (function () {
+    /** @type {number} The max number of change lists (updates containers) we show on the page. */
+    const MAX_UPDATES = 50;
+
     /**
      * Create Element.
      *
@@ -64,6 +67,8 @@
     }
 
     /**
+     * Creates a new updates list and adds it to the DOM for the given update message.
+     *
      * @param {UpdateMessage} updateMessage
      */
     function logChanges(updateMessage) {
@@ -83,12 +88,13 @@
         updateMessage.changes.forEach(change => change.diffs.forEach(diff => {
             const row = rowTemplate.content.cloneNode(true);
             const qs = row.querySelector.bind(row);
+            qs('.update-row').dataset.product = change.product;
             qs('.update-row-product-product').textContent = change.product;
             qs('.update-row-product-file').textContent = change.file !== 'versions' ? ` (${change.file})` : '';
-            qs('.update-row-product').classList.toggle('hidden', !first('prod', `${change.product}|${change.file}`));
+            qs('.update-row-product').dataset.first = `${change.product}|${change.file}`;
 
             qs('.update-row-keys').textContent = diff.keys.join(' ');
-            qs('.update-row-keys').classList.toggle('hidden', !first('keys', `${change.product}|${change.file}|${diff.keys.join(' ')}`));
+            qs('.update-row-keys').dataset.first = `${change.product}|${change.file}|${diff.keys.join(' ')}`;
 
             qs('.update-row-field-name-name').textContent = diff.field;
             qs('.update-row-field-values-new').textContent = diff.newValue || '\u00A0';
@@ -111,12 +117,124 @@
 
         const table = ce('table', {className: 'updates-list'}, rows);
         surround.appendChild(table);
+        updateFilters(surround);
 
         const listParent = document.querySelector('#updates-list-parent');
         listParent.insertBefore(surround, listParent.firstChild);
+        while (listParent.children.length > MAX_UPDATES) {
+            listParent.removeChild(listParent.lastChild);
+        }
     }
 
+    /**
+     * Sets event listeners and initial values in the filters section.
+     */
+    function filterSetup() {
+        const productsBox = document.querySelector('#products-filter');
+        let origValue;
+        try {
+            origValue = localStorage.getItem('products') ?? '';
+            if (origValue !== '') {
+                productsBox.value = origValue;
+            }
+        } catch (e) {
+            console.log('Failed to get products from local storage.');
+        }
+        productsBox.addEventListener('input', () => {
+            updateFilters();
+
+            const value = productsBox.value.trim();
+            try {
+                if (value === '') {
+                    localStorage.removeItem('products');
+                } else {
+                    localStorage.setItem('products', value);
+                }
+            } catch (e) {
+                console.warn('Failed to update local storage', e);
+            }
+        });
+    }
+
+    /**
+     * Returns a regex we can apply to a product string to determine whether it is filtered by the user's preferences.
+     *
+     * @returns {RegExp}
+     */
+    function getProductsRegex() {
+        const ele = document.querySelector('#products-filter');
+        const input = ele.value.trim();
+        delete ele.dataset.invalid;
+
+        if (input === '') {
+            return /.*/;
+        }
+
+        let match = /^\/([\w\W]+)\/([iu]*)$/.exec(input);
+        if (match) {
+            try {
+                return new RegExp(match[1], match[2]);
+            } catch (e) {
+                ele.dataset.invalid = 'true';
+                return /^$/;
+            }
+        }
+
+        return new RegExp(
+            '^(?:' +
+                Array.from(input.matchAll(/[\w*]+/g)).map(match => '(?:' + match[0].replace(/\*/g, '.*') + ')').join('|') +
+                ')$',
+            'i'
+        );
+    }
+
+    /**
+     * Updates the given/all containers to hide/display rows which match the user's filters. Containers which have no
+     * rows visible are themselves hidden.
+     *
+     * @param {HTMLElement} [container] A single updates-list-container to update.
+     */
+    function updateFilters(container) {
+        const containers = container ? [container] : document.querySelectorAll('.updates-list-container');
+
+        const productsRegex = getProductsRegex();
+        containers.forEach(container => {
+            container.querySelectorAll('.update-row[data-product]').forEach(row => {
+                row.classList.toggle('filtered', !productsRegex.test(row.dataset.product));
+            });
+
+            if (!container.querySelector('.update-row:not(.filtered)')) {
+                container.classList.add('filtered');
+
+                return;
+            }
+
+            container.classList.remove('filtered');
+            container.querySelectorAll('[data-first]').forEach(firstEle => {
+                const siblings = container.querySelectorAll(`[data-first="${firstEle.dataset.first}"]`);
+                firstEle.classList.remove('hidden');
+                for (let index = 0; index < siblings.length; index++) {
+                    if (siblings[index] === firstEle) {
+                        // All prior siblings are filtered. Stay visible.
+                        break;
+                    }
+                    if (!siblings[index].closest('.filtered')) {
+                        // This prior sibling is shown. So hide myself.
+                        firstEle.classList.add('hidden');
+                        break;
+                    }
+                    // This prior sibling is filtered. Continue looking.
+                }
+            });
+        });
+    }
+
+    /**
+     * Initial setup.
+     */
     function main() {
+        filterSetup();
+
         let lastSequence = 0;
         const socket = new WebSocket('ws://localhost:8001');
         socket.addEventListener('message', event => {
