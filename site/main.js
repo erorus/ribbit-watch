@@ -90,6 +90,7 @@
             const qs = row.querySelector.bind(row);
             qs('.update-row').dataset.product = change.product;
             qs('.update-row-product-product').textContent = change.product;
+            qs('.update-row-product-product').href = `https://github.com/erorus-everynothing/ribbit/blob/${updateMessage.commitHash}/products/${change.product}/${change.file}`;
             qs('.update-row-product-file').textContent = change.file !== 'versions' ? ` (${change.file})` : '';
             qs('.update-row-product').dataset.first = `${change.product}|${change.file}`;
 
@@ -111,6 +112,10 @@
         {
             const header = document.querySelector('#update-header').content.cloneNode(true);
             header.querySelector('.updates-list-time').textContent = makeDate(updateMessage.timestamp);
+
+            const sequence = header.querySelector('.updates-list-sequence');
+            sequence.textContent = updateMessage.sequence;
+            sequence.href = 'https://github.com/erorus-everynothing/ribbit/commit/' + updateMessage.commitHash;
 
             surround.appendChild(header);
         }

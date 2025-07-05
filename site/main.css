@@ -37,7 +37,8 @@ input[data-invalid] {background-color: #f88}
 .updates-list td:nth-child(4) {width: 32%}
 
 .update-row-field-values-old {color: #666; font-weight: 300}
-.updates-list .hidden {display: none}
+.updates-list .hidden, .updates-list .old {display: none}
 .updates-list tr:hover .hidden {display: revert}
+.updates-list td:hover .old {display: revert}
 
-.updates-list-header {margin-bottom: 1em; text-align: right}
+.updates-list-header {display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1em}

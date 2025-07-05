@@ -14,14 +14,14 @@
 <div id="updates-list-parent"></div>
 <template id="update-header">
     <div class="updates-list-header">
-        <div class="updates-list-time"></div>
+        <a class="updates-list-sequence"></a><div class="updates-list-time"></div>
     </div>
 </template>
 <template id="update-row">
     <tr class="update-row">
         <td>
             <span class="update-row-product">
-                <span class="update-row-product-product"></span><span class="update-row-product-file"></span>
+                <a class="update-row-product-product"></a><span class="update-row-product-file"></span>
             </span>
         </td>
         <td><span class="update-row-keys"></span></td>
@@ -30,7 +30,7 @@
         </td>
         <td class="update-row-field-values">
             <div class="update-row-field-values-new"></div>
-            <div class="update-row-field-values-old hidden"></div>
+            <div class="update-row-field-values-old old"></div>
         </td>
     </tr>
 </template>
