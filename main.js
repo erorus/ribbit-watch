@@ -16,7 +16,7 @@ const PORT = 8001;
  * @typedef {Object} FileChanges
  * @property {string}            product
  * @property {string}            file
- * @property {VersionLineDiff[]} changes
+ * @property {VersionLineDiff[]} diffs
  */
 
 /**
@@ -115,7 +115,7 @@ async function getChanges(ref = 'HEAD') {
         results.push({
             product: pathParts[1],
             file: pathParts[2],
-            changes: ribbitVersions.diffVersionLines(prevLines, curLines),
+            diffs: ribbitVersions.diffVersionLines(prevLines, curLines),
         });
         logMessages.forEach(logMsg);
     }));

@@ -1,0 +1,170 @@
+<!doctype html>
+<html>
+<head>
+    <title>Ribbit Now</title>
+    <style>
+        @font-face {
+            font-family: 'Less Perfect DOS VGA';
+            src: url('LessPerfectDOSVGA.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        body {
+            background-color: #111;
+            color: #aaa;
+            font-family: 'Less Perfect DOS VGA', monospace;
+            font-size: 1.6667vw;
+            margin: 1.6667vw;
+        }
+
+        #updates-list {border-collapse: collapse}
+        #updates-list tr:hover {background-color: #222}
+        #updates-list td {padding-right: 0.6667em; vertical-align: top}
+        .update-row-field-values-old {color: #777}
+        #updates-list .hidden {display: none}
+        #updates-list tr:hover .hidden {display: unset}
+    </style>
+    <script>
+        (function () {
+            /**
+             * Create Element.
+             *
+             * @param {string} tag
+             * @param {object} [props]
+             * @param {HTMLElement} [child]
+             * @return {HTMLElement}
+             */
+            function ce(tag, props, child) {
+                const result = document.createElement(tag);
+
+                co(result, props || {});
+
+                if (child) {
+                    result.appendChild(child);
+                }
+
+                return result;
+            }
+
+            /**
+             * Copy Object. Properties from source are set onto dest.
+             *
+             * @param {object} dest
+             * @param {object} source
+             */
+            function co(dest, source) {
+                for (let k in source) {
+                    if (!source.hasOwnProperty(k)) {
+                        continue;
+                    }
+                    if (typeof source[k] === 'object') {
+                        if (Array.isArray(source[k])) {
+                            dest[k] = source[k].slice(0);
+                        } else {
+                            if (!(k in dest)) {
+                                dest[k] = {};
+                            }
+                            co(dest[k], source[k]);
+                        }
+                    } else {
+                        dest[k] = source[k];
+                    }
+                }
+            }
+
+            function makeDate(timestamp) {
+                const shortFormatter = new Intl.DateTimeFormat([], {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                });
+
+                return shortFormatter.format(new Date(timestamp))
+            }
+
+            /**
+             * @param {UpdateMessage} updateMessage
+             */
+            function logChanges(updateMessage) {
+                const template = document.querySelector('#update-row');
+                const additions = document.createDocumentFragment();
+                additions.appendChild(ce('tr', {}, ce('td', {}, document.createTextNode('\u00A0'))));
+
+                const prev = {};
+                const first = (key, value) => {
+                    if (prev[key] === value) {
+                        return false;
+                    }
+                    prev[key] = value;
+
+                    return true;
+                };
+
+                updateMessage.changes.forEach(change => change.diffs.forEach(diff => {
+                    const row = template.content.cloneNode(true);
+                    const qs = row.querySelector.bind(row);
+                    qs('.update-row-timestamp').textContent = makeDate(updateMessage.timestamp);
+                    qs('.update-row-timestamp').classList.toggle('hidden', !first('time', updateMessage.timestamp));
+
+                    qs('.update-row-product-product').textContent = change.product;
+                    qs('.update-row-product-file').textContent = change.file !== 'versions' ? ` (${change.file})` : '';
+                    qs('.update-row-product').classList.toggle('hidden', !first('prod', `${change.product}|${change.file}`));
+
+                    qs('.update-row-keys').textContent = diff.keys.join(' ');
+                    qs('.update-row-keys').classList.toggle('hidden', !first('keys', `${change.product}|${change.file}|${diff.keys.join(' ')}`));
+
+                    qs('.update-row-field-name-name').textContent = diff.field;
+                    qs('.update-row-field-values-new').textContent = diff.newValue || '\u00A0';
+                    qs('.update-row-field-values-old').textContent = diff.oldValue || '\u00A0';
+
+                    additions.appendChild(row);
+                }));
+
+                const list = document.querySelector('#updates-list');
+                list.insertBefore(additions, list.firstChild);
+            }
+
+            function main() {
+                let lastSequence = 0;
+                const socket = new WebSocket('ws://localhost:8001');
+                socket.addEventListener('message', event => {
+                    /** @type {UpdateMessage} */
+                    const entry = JSON.parse(event.data);
+                    if (entry.sequence < lastSequence) {
+                        return;
+                    }
+
+                    lastSequence = entry.sequence;
+                    logChanges(entry);
+                    console.log(entry);
+                });
+            }
+
+            main();
+        })();
+    </script>
+</head>
+<body>
+<table id="updates-list"></table>
+<template id="update-row">
+    <tr class="update-row">
+        <td><span class="update-row-timestamp"></span></td>
+        <td>
+            <span class="update-row-product">
+                <span class="update-row-product-product"></span><span class="update-row-product-file"></span>
+            </span>
+        </td>
+        <td><span class="update-row-keys"></span></td>
+        <td class="update-row-field-name">
+            <span class="update-row-field-name-name"></span>
+        </td>
+        <td class="update-row-field-values">
+            <div class="update-row-field-values-new"></div>
+            <div class="update-row-field-values-old hidden"></div>
+        </td>
+    </tr>
+</template>
+</body>
+</html>

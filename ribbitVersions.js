@@ -71,15 +71,24 @@ module.exports = new function () {
             }
         }
 
+        const fieldOrder = Object.keys(Object.values(prior)[0] || Object.values(current)[0] || {});
+        const keyOrder = Object.keys(current);
+
         for (const [compoundKey, keys] of fieldMap.entries()) {
             const [field, oldValue, newValue] = compoundKey.split('\0');
             differences.push({
                 field,
                 oldValue: oldValue === '|' ? null : oldValue,
                 newValue: newValue === '|' ? null : newValue,
-                keys: Array.from(keys).sort((a, b) => Object.keys(current).indexOf(a) - Object.keys(current).indexOf(b)),
+                keys: Array.from(keys).sort((a, b) => keyOrder.indexOf(a) - keyOrder.indexOf(b)),
             });
         }
+
+        differences.sort((a, b) =>
+            (b.keys.length - a.keys.length) ||
+            (keyOrder.indexOf(a.keys[0]) - keyOrder.indexOf(b.keys[0])) ||
+            (fieldOrder.indexOf(a.field) - fieldOrder.indexOf(b.field))
+        );
 
         return differences;
     };
