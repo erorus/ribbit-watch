@@ -90,7 +90,6 @@
             function logChanges(updateMessage) {
                 const template = document.querySelector('#update-row');
                 const additions = document.createDocumentFragment();
-                additions.appendChild(ce('tr', {}, ce('td', {}, document.createTextNode('\u00A0'))));
 
                 const prev = {};
                 const first = (key, value) => {
@@ -121,6 +120,12 @@
 
                     additions.appendChild(row);
                 }));
+
+                if (!additions.hasChildNodes()) {
+                    return;
+                }
+
+                additions.insertBefore(ce('tr', {}, ce('td', {}, document.createTextNode('\u00A0'))), additions.firstChild);
 
                 const list = document.querySelector('#updates-list');
                 list.insertBefore(additions, list.firstChild);
