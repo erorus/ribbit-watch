@@ -42,3 +42,6 @@ input[data-invalid] {background-color: #f88}
 .updates-list td:hover .old {display: revert}
 
 .updates-list-header {display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1em}
+
+a {text-decoration: none}
+a:hover {text-decoration: revert}
