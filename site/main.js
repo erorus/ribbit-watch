@@ -10,7 +10,7 @@
     const CDN_HOST = 'https://level3.blizzard.com/';
 
     /** @type {number} Updates which are detected less than this long ago are eligible to have notifications. */
-    const NOTIFICATION_WINDOW = 96 * 60 * 60 * 1000;
+    const NOTIFICATION_WINDOW = 10 * 60 * 1000;
 
     /** @type {number} The max number of change lists (updates containers) we show on the page. */
     const MAX_UPDATES = 50;
