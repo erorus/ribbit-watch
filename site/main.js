@@ -492,6 +492,7 @@
                     body: `Notifications enabled!`,
                     icon: (new URL('inv_frog2_darkgreen.jpg', location.href)).toString(),
                     silent: true,
+                    tag: 'ribbit-enabled',
                 });
                 playAudio();
             } else {
