@@ -272,6 +272,7 @@
         qs('#filters-reset').addEventListener('click', () => {
             productsBox.value = '';
             qsa('.columns-filter').forEach(checkbox => checkbox.checked = true);
+            qs('#encrypted-filter').checked = true;
             updateFilters();
         });
 
