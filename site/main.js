@@ -2,6 +2,9 @@
     /** @type {number} The max number of change lists (updates containers) we show on the page. */
     const MAX_UPDATES = 50;
 
+    /** @type {Object<string, string>} A map of product => path from cdns endpoint. */
+    let productPaths = {};
+
     /**
      * Create Element.
      *
@@ -300,10 +303,19 @@
     /**
      * Initial setup.
      */
-    function main() {
+    async function main() {
         filterSetup();
         readUrl() || readLocalStorage();
         window.addEventListener('popstate', () => {readUrl(); updateFilters()});
+
+        {
+            const response = await fetch('configPaths.json', {
+                credentials: 'omit',
+                mode: 'same-origin',
+            });
+
+            productPaths = await response.json();
+        }
 
         let lastSequence = 0;
         const socket = new WebSocket('ws://localhost:8001');
