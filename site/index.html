@@ -7,7 +7,16 @@
     <script src="main.js"></script>
 </head>
 <body>
-<div class="filter-container">
+<div class="page-heading major-section">
+    <div>
+        <h1>Ribbit Watch</h1>
+    </div>
+    <div id="online-indicator">
+        <span id="online-indicator-on">Online 🟢</span>
+        <span id="online-indicator-off"><button id="online-connect">Connect</button> Offline 🔴</span>
+    </div>
+</div>
+<div class="filter-container major-section">
     <div>
         <span>Products:&nbsp;</span><input type="text" id="products-filter" style="flex: 1 0 auto" placeholder="wow wowt wowxptr wow_beta wow_classic*"><label><input type="checkbox" id="encrypted-filter" CHECKED>+Encrypted</label>
     </div>
@@ -28,9 +37,8 @@
         <label><input type="checkbox" class="columns-filter" value="ConfigPath" CHECKED>ConfigPath</label>
     </div>
     <div style="justify-content: space-between">
-        <div id="online-indicator">
-            <span id="online-indicator-on">🟢 Online</span>
-            <span id="online-indicator-off">🔴 Offline <button id="online-connect">Connect</button></span>
+        <div>
+            <label><input type="checkbox" id="notifications-input">Notifications</label>
         </div>
         <div>
             <button id="filters-reset">Reset</button>

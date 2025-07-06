@@ -18,6 +18,8 @@ input[data-invalid] {background-color: #f88}
     background-color: #ddd;
     border: 1px solid #111;
     border-radius: 5px;
+}
+.updates-list-container, .major-section {
     box-sizing: content-box;
     margin: 1em auto;
     padding: 1em;
@@ -54,6 +56,8 @@ a:hover {text-decoration: revert}
 .filter-container > div {display: flex; align-items: center; margin: 1em 0}
 .filter-container label {cursor: pointer; margin-right: 1em; user-select: none}
 .filter-container button {cursor: pointer; margin-left: 1em; user-select: none}
+
+.page-heading {display: flex; justify-content: space-between; align-items: center; padding: 0}
 
 #online-indicator > span {display: none}
 #online-indicator[data-online="on"] > span#online-indicator-on {display: revert}

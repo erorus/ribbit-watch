@@ -15,11 +15,11 @@
     /** @type {string} The Blizzard CDN path fragment we use for all product config links. */
     const PRODUCT_CONFIG_PATH = 'tpr/configs/data';
 
-    /** @type {WebSocket} */
-    let socket;
-
     /** @type {Object<string, Deets>} A map of product => details. */
     let productDeets = {};
+
+    /** @type {WebSocket} */
+    let socket;
 
     /**
      * Create Element.
@@ -417,12 +417,60 @@
     }
 
     /**
+     * Sets up the notifications checkbox.
+     */
+    function notificationsSetup() {
+        const checkbox = qs('#notifications-input');
+        checkbox.checked = false;
+
+        if (!window.Notification || Notification.permission === 'denied') {
+            checkbox.disabled = true;
+            return;
+        }
+
+        if (Notification.permission === 'granted') {
+            try {
+                if ((localStorage.getItem('notifications') ?? '') !== '') {
+                    checkbox.checked = true;
+                }
+            } catch (e) {
+                console.warn('Unable to read local storage for notifications setting.', e);
+            }
+        }
+
+        checkbox.addEventListener('change', async () => {
+            if (!checkbox.checked) {
+                try {
+                    localStorage.removeItem('notifications');
+                } catch (e) {}
+
+                return;
+            }
+
+            if (Notification.permission === 'default') {
+                await Notification.requestPermission();
+            }
+
+            if (Notification.permission === 'granted') {
+                try {
+                    localStorage.setItem('notifications', 'on');
+                } catch (e) {
+                    console.warn('Unable to set local storage for notifications setting.', e);
+                }
+            } else {
+                checkbox.checked = false;
+            }
+        });
+    }
+
+    /**
      * Initial setup.
      */
     async function main() {
         filterSetup();
         readLocation() || readLocalStorage();
         window.addEventListener('popstate', () => {readLocation(); updateFilters()});
+        notificationsSetup();
 
         {
             const response = await fetch('deets.json', {credentials: 'omit', mode: 'same-origin'});
