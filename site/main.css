@@ -38,6 +38,7 @@ input[data-invalid] {background-color: #f88}
 .updates-list td:nth-child(4) {width: 32%}
 
 .update-row-field-values-old {color: #666; font-weight: 300}
+.update-row-field-values-old a {color: #666}
 .update-row-product-file {font-size: 80%}
 
 .updates-list .hidden, .updates-list .old {display: none}

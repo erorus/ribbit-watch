@@ -2,6 +2,9 @@
     /** @type {number} The max number of change lists (updates containers) we show on the page. */
     const MAX_UPDATES = 50;
 
+    const CDN_HOST = 'https://level3.blizzard.com/';
+    const PRODUCT_CONFIG_PATH = 'tpr/configs/data';
+
     /** @type {Object<string, string>} A map of product => path from cdns endpoint. */
     let productPaths = {};
 
@@ -81,6 +84,44 @@
         const rowTemplate = qs('#update-row');
         const rows = document.createDocumentFragment();
 
+        /**
+         * Returns value as a text node, or as a link when the field indicates it's a file hash.
+         *
+         * @param {string} product
+         * @param {string} field
+         * @param {string} value
+         * @returns {Node}
+         */
+        const makeValueLink = (product, field, value) => {
+            if (value === '') {
+                return document.createTextNode('\u00A0');
+            }
+
+            let url = '';
+
+            switch (field) {
+                case 'BuildConfig':
+                case 'CDNConfig':
+                case 'KeyRing':
+                    const path = productPaths[product];
+                    if (path) {
+                        url = `${CDN_HOST}${path}/config/${value.substring(0, 2)}/${value.substring(2, 4)}/${value}`;
+                    }
+                    break;
+
+                case 'ProductConfig':
+                    url = `${CDN_HOST}${PRODUCT_CONFIG_PATH}/${value.substring(0, 2)}/${value.substring(2, 4)}/${value}`;
+                    break;
+            }
+
+            const text = document.createTextNode(value);
+            if (url) {
+                return ce('a', {href: url}, text);
+            }
+
+            return text;
+        };
+
         updateMessage.changes.forEach(change => change.diffs.forEach(diff => {
             const row = rowTemplate.content.cloneNode(true);
             const qs = row.querySelector.bind(row);
@@ -95,8 +136,8 @@
             qs('.update-row-keys').dataset.first = `${change.product}|${change.file}|${diff.keys.join(' ')}`;
 
             qs('.update-row-field-name-name').textContent = diff.field;
-            qs('.update-row-field-values-new').textContent = diff.newValue || '\u00A0';
-            qs('.update-row-field-values-old').textContent = diff.oldValue || '\u00A0';
+            qs('.update-row-field-values-new').appendChild(makeValueLink(change.product, diff.field, diff.newValue));
+            qs('.update-row-field-values-old').appendChild(makeValueLink(change.product, diff.field, diff.oldValue));
 
             rows.appendChild(row);
         }));
@@ -223,11 +264,11 @@
     }
 
     /**
-     * Sets our filters to reflect those in the URL.
+     * Sets our filters to reflect those in this page's location.
      *
-     * @returns {boolean} True when we used things from the URL.
+     * @returns {boolean} True when we used things from the location.
      */
-    function readUrl() {
+    function readLocation() {
         const url = new URL(location.href);
         const productsEle = qs('#products-filter');
         productsEle.value = url.searchParams.get('products') ?? '';
@@ -305,8 +346,8 @@
      */
     async function main() {
         filterSetup();
-        readUrl() || readLocalStorage();
-        window.addEventListener('popstate', () => {readUrl(); updateFilters()});
+        readLocation() || readLocalStorage();
+        window.addEventListener('popstate', () => {readLocation(); updateFilters()});
 
         {
             const response = await fetch('configPaths.json', {
