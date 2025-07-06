@@ -1,16 +1,22 @@
 (function () {
     /**
      * @typedef {Object} Deets
-     * @property {string} configPath
-     * @property {string} key
-     * @property {string} name
+     * @property {string} configPath The Blizzard CDN path fragment used by build configs, cdn configs, etc.
+     * @property {string} key        The encryption key name used by this product.
+     * @property {string} name       A user-facing name for this product.
      */
 
     /** @type {number} The max number of change lists (updates containers) we show on the page. */
     const MAX_UPDATES = 50;
 
+    /** @type {string} Blizzard's CDN host we use to link to various configs. */
     const CDN_HOST = 'https://level3.blizzard.com/';
+
+    /** @type {string} The Blizzard CDN path fragment we use for all product config links. */
     const PRODUCT_CONFIG_PATH = 'tpr/configs/data';
+
+    /** @type {WebSocket} */
+    let socket;
 
     /** @type {Object<string, Deets>} A map of product => details. */
     let productDeets = {};
@@ -20,7 +26,7 @@
      *
      * @param {string} tag
      * @param {object} [props]
-     * @param {HTMLElement} [child]
+     * @param {Node} [child]
      * @return {HTMLElement}
      */
     function ce(tag, props, child) {
@@ -65,6 +71,31 @@
     const qsa = selector => document.querySelectorAll(selector);
 
     /**
+     * Connects to the websocket to listen for events.
+     */
+    function connect() {
+        const showOnline = () => {
+            qs('#online-indicator').dataset.online = 'on';
+            document.title = document.title.replace(/ \(Offline\)/, '');
+            qs('#icon-link').href = 'green.png';
+        };
+
+        const showOffline = () => {
+            socket?.close();
+            qs('#online-indicator').dataset.online = 'off';
+            document.title = document.title.replace(/ \(Offline\)/, '') + ' (Offline)';
+            qs('#icon-link').href = 'red.png';
+        };
+
+        showOffline();
+        socket = new WebSocket('ws://localhost:8001');
+        socket.addEventListener('open', showOnline);
+        socket.addEventListener('close', showOffline);
+        socket.addEventListener('error', showOffline);
+        socket.addEventListener('message', event => void logChanges(JSON.parse(event.data)));
+    }
+
+    /**
      * Returns a formatted string for the given timestamp.
      *
      * @param {number} timestamp
@@ -88,6 +119,11 @@
      * @param {UpdateMessage} updateMessage
      */
     function logChanges(updateMessage) {
+        const listParent = qs('#updates-list-parent');
+        if (qs(`#updates-list-parent .updates-list-container[data-sequence="${updateMessage.sequence}"]`)) {
+            return;
+        }
+
         const rowTemplate = qs('#update-row');
         const rows = document.createDocumentFragment();
 
@@ -162,7 +198,10 @@
             return;
         }
 
-        const surround = ce('div', {className: 'updates-list-container'});
+        const surround = ce('div', {
+            className: 'updates-list-container',
+            dataset: {sequence: `${updateMessage.sequence}`},
+        });
         {
             const header = qs('#update-header').content.cloneNode(true);
             header.querySelector('.updates-list-time').textContent = makeDate(updateMessage.timestamp);
@@ -178,8 +217,15 @@
         surround.appendChild(table);
         updateFilters(surround);
 
-        const listParent = qs('#updates-list-parent');
         listParent.insertBefore(surround, listParent.firstChild);
+        const surroundSequences = Array.from(listParent.querySelectorAll(':scope > .updates-list-container'))
+            .map(surround => parseInt(surround.dataset.sequence));
+        const sortedSequences = surroundSequences.slice().sort((a, b) => b - a);
+        if (JSON.stringify(surroundSequences) !== JSON.stringify(sortedSequences)) {
+            sortedSequences.forEach(sequence => listParent.appendChild(listParent.querySelector(
+                `:scope > .updates-list-container[data-sequence="${sequence}"]`
+            )));
+        }
         while (listParent.children.length > MAX_UPDATES) {
             listParent.removeChild(listParent.lastChild);
         }
@@ -383,18 +429,8 @@
             productDeets = await response.json();
         }
 
-        let lastSequence = 0;
-        const socket = new WebSocket('ws://localhost:8001');
-        socket.addEventListener('message', event => {
-            /** @type {UpdateMessage} */
-            const entry = JSON.parse(event.data);
-            if (entry.sequence < lastSequence) {
-                return;
-            }
-
-            lastSequence = entry.sequence;
-            logChanges(entry);
-        });
+        qs('#online-connect').addEventListener('click', connect);
+        connect();
     }
 
     window.addEventListener('DOMContentLoaded', () => main());

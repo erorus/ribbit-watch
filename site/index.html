@@ -1,8 +1,9 @@
 <!doctype html>
 <html>
 <head>
-    <title>Ribbit Now</title>
+    <title>Ribbit Watch</title>
     <link rel="stylesheet" href="main.css">
+    <link rel="icon" href="inv_frog2_darkgreen.jpg" id="icon-link">
     <script src="main.js"></script>
 </head>
 <body>
@@ -26,10 +27,16 @@
         <label><input type="checkbox" class="columns-filter" value="Servers" CHECKED>Servers</label>
         <label><input type="checkbox" class="columns-filter" value="ConfigPath" CHECKED>ConfigPath</label>
     </div>
-    <div style="justify-content: flex-end">
-        <button id="filters-reset">Reset</button>
-        <button id="filters-load">Load</button>
-        <button id="filters-save">Save</button>
+    <div style="justify-content: space-between">
+        <div id="online-indicator">
+            <span id="online-indicator-on">🟢 Online</span>
+            <span id="online-indicator-off">🔴 Offline <button id="online-connect">Connect</button></span>
+        </div>
+        <div>
+            <button id="filters-reset">Reset</button>
+            <button id="filters-load">Load</button>
+            <button id="filters-save">Save</button>
+        </div>
     </div>
 </div>
 <div id="updates-list-parent"></div>
