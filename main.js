@@ -151,7 +151,7 @@ async function main() {
         });
     }, 30000);
     wss.on('close', () => clearInterval(pingInterval));
-    server.listen(PORT, () => logMsg(`Server started on port ${PORT}.`));
+    server.listen(PORT, '127.0.0.1', () => logMsg(`Server started on port ${PORT}.`));
 
     logMsg('Watching for new commits.');
     await gitWatcher.watchHead(async (commit) => {
