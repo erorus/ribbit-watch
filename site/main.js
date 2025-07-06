@@ -94,7 +94,10 @@
         };
 
         showOffline();
-        socket = new WebSocket('ws://localhost:8001');
+        socket = new WebSocket(location.hostname === '127.0.0.1' ?
+            'ws://localhost:8001' :
+            `wss://${location.hostname}/updates`,
+        );
         socket.addEventListener('open', showOnline);
         socket.addEventListener('close', showOffline);
         socket.addEventListener('error', showOffline);
