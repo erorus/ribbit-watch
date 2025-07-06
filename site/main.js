@@ -252,16 +252,7 @@
                     silent: true,
                     tag: 'ribbit',
                 });
-
-                if (!audioOnCooldown) {
-                    audioOnCooldown = true;
-
-                    const audio = new Audio('Hex_Frog.ogg');
-                    audio.volume = 0.5;
-                    audio.play();
-
-                    setTimeout(() => audioOnCooldown = false, 5000);
-                }
+                playAudio();
             }
         }
     }
@@ -496,6 +487,29 @@
                 checkbox.checked = false;
             }
         });
+    }
+
+    /**
+     * Plays the audio alert if we're not on cooldown.
+     */
+    async function playAudio() {
+        if (audioOnCooldown) {
+            return;
+        }
+
+        audioOnCooldown = true;
+
+        const audio = new Audio('Hex_Frog.ogg');
+        audio.volume = 0.5;
+        try {
+            await audio.play();
+            qs('#audio-autoplay-failed').style.display = 'none';
+        } catch (e) {
+            console.warn('Failed to play audio.', e);
+            qs('#audio-autoplay-failed').style.display = 'revert';
+        }
+
+        setTimeout(() => audioOnCooldown = false, 5000);
     }
 
     /**
