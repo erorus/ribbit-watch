@@ -487,6 +487,13 @@
                 } catch (e) {
                     console.warn('Unable to set local storage for notifications setting.', e);
                 }
+
+                new Notification('Ribbit Watch', {
+                    body: `Notifications enabled!`,
+                    icon: (new URL('inv_frog2_darkgreen.jpg', location.href)).toString(),
+                    silent: true,
+                });
+                playAudio();
             } else {
                 checkbox.checked = false;
             }
