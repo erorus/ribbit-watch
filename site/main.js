@@ -30,6 +30,9 @@
     /** @type {WebSocket} */
     let socket;
 
+    /** @type {boolean} True when we will use CSS transitions for new updates. */
+    let transitioningNewUpdates = false;
+
     /**
      * Create Element.
      *
@@ -87,9 +90,11 @@
             qs('#online-indicator').dataset.online = 'on';
             document.title = document.title.replace(/ \(Offline\)/, '');
             qs('#icon-link').href = 'green.png';
+            window.setTimeout(() => void (transitioningNewUpdates = true), 5000);
         };
 
         const showOffline = () => {
+            transitioningNewUpdates = false;
             socket?.close();
             qs('#online-indicator').dataset.online = 'off';
             document.title = document.title.replace(/ \(Offline\)/, '') + ' (Offline)';
@@ -214,6 +219,10 @@
             className: 'updates-list-container',
             dataset: {sequence: `${updateMessage.sequence}`},
         });
+        if (transitioningNewUpdates) {
+            surround.style.opacity = '0';
+            surround.style.maxHeight = '0';
+        }
         // Add the header to the surround.
         {
             const header = qs('#update-header').content.cloneNode(true);
@@ -243,6 +252,20 @@
         }
         while (listParent.children.length > MAX_UPDATES) {
             listParent.removeChild(listParent.lastChild);
+        }
+
+        if (transitioningNewUpdates) {
+            const finishedHandler = event => {
+                if (event.propertyName === 'max-height') {
+                    surround.style.maxHeight = '';
+                    surround.removeEventListener('transitionend', finishedHandler);
+                }
+            };
+            window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+                surround.addEventListener('transitionend', finishedHandler);
+                surround.style.maxHeight = surround.scrollHeight + 'px';
+                surround.style.opacity = '';
+            }));
         }
 
         if (document.visibilityState === 'hidden') {
