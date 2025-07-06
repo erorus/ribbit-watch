@@ -21,6 +21,9 @@
     /** @type {boolean} Whether we recently played any audio. */
     let audioOnCooldown = false;
 
+    /** @type {number} How many update messages were added while the tab was hidden. */
+    let pendingCount = 0;
+
     /** @type {Object<string, Deets>} A map of product => details. */
     let productDeets = {};
 
@@ -240,6 +243,12 @@
         }
         while (listParent.children.length > MAX_UPDATES) {
             listParent.removeChild(listParent.lastChild);
+        }
+
+        if (document.visibilityState === 'hidden') {
+            pendingCount++;
+            document.title = `(${pendingCount}) ` + document.title.replace(/^\(\d+\)\s*/, '');
+            surround.classList.add('pending');
         }
 
         // Notifications
@@ -537,6 +546,14 @@
             const response = await fetch('deets.json', {credentials: 'omit', mode: 'same-origin'});
             productDeets = await response.json();
         }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                qsa('.updates-list-container.pending').forEach(surround => surround.classList.remove('pending'));
+                document.title = document.title.replace(/^\(\d+\)\s*/, '');
+                pendingCount = 0;
+            }
+        });
 
         qs('#online-connect').addEventListener('click', connect);
         connect();

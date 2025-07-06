@@ -25,6 +25,8 @@ input[data-invalid] {background-color: #f88}
     padding: 1em;
     width: 900px;
 }
+.updates-list-container {transition: background-color 1s ease 5s}
+.updates-list-container.pending {background-color: #cfc}
 .updates-list {border-collapse: collapse; table-layout: fixed; width: 900px}
 .filtered {display: none}
 .updates-list tr:hover {background-color: #ccc}
