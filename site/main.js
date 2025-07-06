@@ -48,6 +48,9 @@
         }
     }
 
+    const qs = selector => document.querySelector(selector);
+    const qsa = selector => document.querySelectorAll(selector);
+
     /**
      * Returns a formatted string for the given timestamp.
      *
@@ -72,7 +75,7 @@
      * @param {UpdateMessage} updateMessage
      */
     function logChanges(updateMessage) {
-        const rowTemplate = document.querySelector('#update-row');
+        const rowTemplate = qs('#update-row');
         const rows = document.createDocumentFragment();
 
         updateMessage.changes.forEach(change => change.diffs.forEach(diff => {
@@ -101,7 +104,7 @@
 
         const surround = ce('div', {className: 'updates-list-container'});
         {
-            const header = document.querySelector('#update-header').content.cloneNode(true);
+            const header = qs('#update-header').content.cloneNode(true);
             header.querySelector('.updates-list-time').textContent = makeDate(updateMessage.timestamp);
 
             const sequence = header.querySelector('.updates-list-sequence');
@@ -115,7 +118,7 @@
         surround.appendChild(table);
         updateFilters(surround);
 
-        const listParent = document.querySelector('#updates-list-parent');
+        const listParent = qs('#updates-list-parent');
         listParent.insertBefore(surround, listParent.firstChild);
         while (listParent.children.length > MAX_UPDATES) {
             listParent.removeChild(listParent.lastChild);
@@ -126,11 +129,42 @@
      * Sets event listeners and initial values in the filters section.
      */
     function filterSetup() {
-        const productsBox = document.querySelector('#products-filter');
+        const productsBox = qs('#products-filter');
         productsBox.addEventListener('input', () => updateFilters());
 
-        document.querySelectorAll('.columns-filter')
+        qsa('.columns-filter')
             .forEach(ele => ele.addEventListener('change', () => updateFilters()));
+
+        qs('#filters-reset').addEventListener('click', () => {
+            productsBox.value = '';
+            qsa('.columns-filter').forEach(checkbox => checkbox.checked = true);
+            updateFilters();
+        });
+
+        qs('#filters-load').addEventListener('click', () => {
+            readLocalStorage();
+            updateFilters();
+        });
+
+        qs('#filters-save').addEventListener('click', () => {
+            try {
+                const save = (key, value) => {
+                    if (value === '') {
+                        localStorage.removeItem(key);
+                    } else {
+                        localStorage.setItem(key, value);
+                    }
+                };
+
+                save('products', productsBox.value.trim());
+                save('skipFields', Array.from(qsa('.columns-filter'))
+                    .filter(checkbox => !checkbox.checked)
+                    .map(checkbox => checkbox.value)
+                    .join(' '));
+            } catch (e) {
+                console.warn('Could not save settings in local storage.', e);
+            }
+        });
     }
 
     /**
@@ -139,7 +173,7 @@
      * @returns {RegExp}
      */
     function getProductsRegex() {
-        const ele = document.querySelector('#products-filter');
+        const ele = qs('#products-filter');
         const input = ele.value.trim();
         delete ele.dataset.invalid;
 
@@ -166,14 +200,39 @@
     }
 
     /**
+     * Sets our filters to reflect those in local storage.
+     */
+    function readLocalStorage() {
+        let products = '';
+        let skipFields = '';
+        try {
+            products = localStorage.getItem('products') ?? '';
+            skipFields = localStorage.getItem('skipFields') ?? '';
+        } catch (e) {
+            console.warn('Could not read local storage.', e);
+        }
+
+        const productsEle = qs('#products-filter');
+        productsEle.value = products;
+        skipFields = skipFields.split(/\s+/);
+        qsa('.columns-filter')
+            .forEach(checkbox => checkbox.checked = !skipFields.includes(checkbox.value));
+    }
+
+    /**
      * Sets our filters to reflect those in the URL.
+     *
+     * @returns {boolean} True when we used things from the URL.
      */
     function readUrl() {
         const url = new URL(location.href);
-        document.querySelector('#products-filter').value = url.searchParams.get('products') ?? '';
+        const productsEle = qs('#products-filter');
+        productsEle.value = url.searchParams.get('products') ?? '';
         const skipFields = (url.searchParams.get('skipFields') ?? '').split(/\s+/);
-        document.querySelectorAll('.columns-filter')
+        qsa('.columns-filter')
             .forEach(checkbox => checkbox.checked = !skipFields.includes(checkbox.value));
+
+        return (productsEle.value !== '') || (qs('.columns-filter:not(:checked)') != null);
     }
 
     /**
@@ -183,8 +242,8 @@
      * @param {HTMLElement} [container] A single updates-list-container to update.
      */
     function updateFilters(container) {
-        const containers = container ? [container] : document.querySelectorAll('.updates-list-container');
-        const deniedFields = Array.from(document.querySelectorAll('.columns-filter'))
+        const containers = container ? [container] : qsa('.updates-list-container');
+        const deniedFields = Array.from(qsa('.columns-filter'))
             .filter(checkbox => !checkbox.checked)
             .map(checkbox => checkbox.value);
 
@@ -223,7 +282,7 @@
         });
 
         // Update URL
-        const productsFilter = document.querySelector('#products-filter').value.trim();
+        const productsFilter = qs('#products-filter').value.trim();
         const params = new URLSearchParams();
         if (productsFilter !== '') {
             params.set('products', productsFilter);
@@ -243,7 +302,7 @@
      */
     function main() {
         filterSetup();
-        readUrl();
+        readUrl() || readLocalStorage();
         window.addEventListener('popstate', () => {readUrl(); updateFilters()});
 
         let lastSequence = 0;

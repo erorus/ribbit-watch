@@ -10,7 +10,8 @@ body {
     line-height: 1.33;
 }
 
-input {font-family: 'JetBrains Mono', monospace; font-weight: 300; font-style: normal; font-size: 14px}
+input[type="text"] {font-family: 'JetBrains Mono', monospace; font-weight: 300; font-style: normal; font-size: 14px}
+button {font-family: 'JetBrains Mono', monospace; font-size: 14px}
 input[data-invalid] {background-color: #f88}
 
 .updates-list-container, .filter-container {
@@ -51,3 +52,4 @@ a:hover {text-decoration: revert}
 .filter-container {padding-top: 0; padding-bottom: 0}
 .filter-container > div {display: flex; align-items: center; margin: 1em 0}
 .filter-container label {cursor: pointer; margin-right: 1em; user-select: none}
+.filter-container button {cursor: pointer; margin-left: 1em; user-select: none}
