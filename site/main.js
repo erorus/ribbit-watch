@@ -6,11 +6,14 @@
      * @property {string} name       A user-facing name for this product.
      */
 
-    /** @type {number} The max number of change lists (updates containers) we show on the page. */
-    const MAX_UPDATES = 50;
-
     /** @type {string} Blizzard's CDN host we use to link to various configs. */
     const CDN_HOST = 'https://level3.blizzard.com/';
+
+    /** @type {number} Updates which are detected less than this long ago are eligible to have notifications. */
+    const NOTIFICATION_WINDOW = 96 * 60 * 60 * 1000;
+
+    /** @type {number} The max number of change lists (updates containers) we show on the page. */
+    const MAX_UPDATES = 50;
 
     /** @type {string} The Blizzard CDN path fragment we use for all product config links. */
     const PRODUCT_CONFIG_PATH = 'tpr/configs/data';
@@ -136,7 +139,7 @@
          * @returns {Node}
          */
         const makeValueLink = (product, field, value) => {
-            if (value === '') {
+            if ((value ?? '') === '') {
                 return document.createTextNode('\u00A0');
             }
 
@@ -228,6 +231,20 @@
         }
         while (listParent.children.length > MAX_UPDATES) {
             listParent.removeChild(listParent.lastChild);
+        }
+
+        if (updateMessage.timestamp + NOTIFICATION_WINDOW > Date.now() && qs('#notifications-input').checked) {
+            const products = Array.from(new Set(
+                Array.from(surround.querySelectorAll('.update-row:not(.filtered)')).map(row => row.dataset.product)
+            )).sort((a, b) => a.localeCompare(b)).join(', ');
+
+            if (products.length) {
+                new Notification('Ribbit Watch', {
+                    body: `New Ribbit Update for ${products}`,
+                    icon: (new URL('inv_frog2_darkgreen.jpg', location.href)).toString(),
+                    tag: 'ribbit',
+                });
+            }
         }
     }
 
