@@ -143,6 +143,7 @@
             if (deets?.key) {
                 qs('.update-row-product-lock').textContent = '🔒';
                 qs('.update-row-product-lock').title = `Encrypted: ${deets.key}`;
+                qs('.update-row').dataset.encrypted = deets.key;
             }
             qs('.update-row-product-file').textContent = change.file !== 'versions' ? `/${change.file}` : '';
             qs('.update-row-product').dataset.first = `${change.product}|${change.file}`;
@@ -194,6 +195,8 @@
         qsa('.columns-filter')
             .forEach(ele => ele.addEventListener('change', () => updateFilters()));
 
+        qs('#encrypted-filter').addEventListener('change', () => updateFilters());
+
         qs('#filters-reset').addEventListener('click', () => {
             productsBox.value = '';
             qsa('.columns-filter').forEach(checkbox => checkbox.checked = true);
@@ -220,6 +223,7 @@
                     .filter(checkbox => !checkbox.checked)
                     .map(checkbox => checkbox.value)
                     .join(' '));
+                save('skipEncrypted', qs('#encrypted-filter').checked ? '' : 'true');
             } catch (e) {
                 console.warn('Could not save settings in local storage.', e);
             }
@@ -264,15 +268,18 @@
     function readLocalStorage() {
         let products = '';
         let skipFields = '';
+        let skipEncrypted = '';
         try {
             products = localStorage.getItem('products') ?? '';
             skipFields = localStorage.getItem('skipFields') ?? '';
+            skipEncrypted = localStorage.getItem('skipEncrypted') ?? '';
         } catch (e) {
             console.warn('Could not read local storage.', e);
         }
 
         const productsEle = qs('#products-filter');
         productsEle.value = products;
+        qs('#encrypted-filter').checked = skipEncrypted === '';
         skipFields = skipFields.split(/\s+/);
         qsa('.columns-filter')
             .forEach(checkbox => checkbox.checked = !skipFields.includes(checkbox.value));
@@ -287,11 +294,13 @@
         const url = new URL(location.href);
         const productsEle = qs('#products-filter');
         productsEle.value = url.searchParams.get('products') ?? '';
+        const encryptedEle = qs('#encrypted-filter');
+        encryptedEle.checked = (url.searchParams.get('encrypted') ?? '') === '';
         const skipFields = (url.searchParams.get('skipFields') ?? '').split(/\s+/);
         qsa('.columns-filter')
             .forEach(checkbox => checkbox.checked = !skipFields.includes(checkbox.value));
 
-        return (productsEle.value !== '') || (qs('.columns-filter:not(:checked)') != null);
+        return (productsEle.value !== '') || !encryptedEle.checked || (qs('.columns-filter:not(:checked)') != null);
     }
 
     /**
@@ -307,11 +316,13 @@
             .map(checkbox => checkbox.value);
 
         const productsRegex = getProductsRegex();
+        const encryptedEle = qs('#encrypted-filter');
         containers.forEach(container => {
             container.querySelectorAll('.update-row[data-product]').forEach(row => {
                 row.classList.toggle('filtered',
                     !productsRegex.test(row.dataset.product) ||
-                    deniedFields.includes(row.dataset.field)
+                    deniedFields.includes(row.dataset.field) ||
+                    (!encryptedEle.checked && !!row.dataset.encrypted)
                 );
             });
 
@@ -348,6 +359,9 @@
         }
         if (deniedFields.length) {
             params.set('skipFields', deniedFields.join(' '));
+        }
+        if (!encryptedEle.checked) {
+            params.set('encrypted', 'no');
         }
         if (location.search.replace(/^\?/, '') !== params.toString()) {
             const next = new URL(location.href);
