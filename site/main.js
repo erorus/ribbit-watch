@@ -18,6 +18,9 @@
     /** @type {string} The Blizzard CDN path fragment we use for all product config links. */
     const PRODUCT_CONFIG_PATH = 'tpr/configs/data';
 
+    /** @type {boolean} Whether we recently played any audio. */
+    let audioOnCooldown = false;
+
     /** @type {Object<string, Deets>} A map of product => details. */
     let productDeets = {};
 
@@ -205,6 +208,7 @@
             className: 'updates-list-container',
             dataset: {sequence: `${updateMessage.sequence}`},
         });
+        // Add the header to the surround.
         {
             const header = qs('#update-header').content.cloneNode(true);
             header.querySelector('.updates-list-time').textContent = makeDate(updateMessage.timestamp);
@@ -216,10 +220,12 @@
             surround.appendChild(header);
         }
 
+        // Add the table and its rows to the surround, then hide rows we're filtering.
         const table = ce('table', {className: 'updates-list'}, rows);
         surround.appendChild(table);
         updateFilters(surround);
 
+        // Add surround to parent and sort surrounds.
         listParent.insertBefore(surround, listParent.firstChild);
         const surroundSequences = Array.from(listParent.querySelectorAll(':scope > .updates-list-container'))
             .map(surround => parseInt(surround.dataset.sequence));
@@ -233,6 +239,7 @@
             listParent.removeChild(listParent.lastChild);
         }
 
+        // Notifications
         if (updateMessage.timestamp + NOTIFICATION_WINDOW > Date.now() && qs('#notifications-input').checked) {
             const products = Array.from(new Set(
                 Array.from(surround.querySelectorAll('.update-row:not(.filtered)')).map(row => row.dataset.product)
@@ -242,8 +249,19 @@
                 new Notification('Ribbit Watch', {
                     body: `New Ribbit Update for ${products}`,
                     icon: (new URL('inv_frog2_darkgreen.jpg', location.href)).toString(),
+                    silent: true,
                     tag: 'ribbit',
                 });
+
+                if (!audioOnCooldown) {
+                    audioOnCooldown = true;
+
+                    const audio = new Audio('Hex_Frog.ogg');
+                    audio.volume = 0.5;
+                    audio.play();
+
+                    setTimeout(() => audioOnCooldown = false, 5000);
+                }
             }
         }
     }
