@@ -37,6 +37,8 @@ input[data-invalid] {background-color: #f88}
 .updates-list td:nth-child(4) {width: 32%}
 
 .update-row-field-values-old {color: #666; font-weight: 300}
+.update-row-product-file {font-size: 80%}
+
 .updates-list .hidden, .updates-list .old {display: none}
 .updates-list tr:hover .hidden {display: revert}
 .updates-list td:hover .old {display: revert}

@@ -82,7 +82,7 @@
             qs('.update-row').dataset.field = diff.field;
             qs('.update-row-product-product').textContent = change.product;
             qs('.update-row-product-product').href = `https://github.com/erorus-everynothing/ribbit/blob/${updateMessage.commitHash}/products/${change.product}/${change.file}`;
-            qs('.update-row-product-file').textContent = change.file !== 'versions' ? ` (${change.file})` : '';
+            qs('.update-row-product-file').textContent = change.file !== 'versions' ? `/${change.file}` : '';
             qs('.update-row-product').dataset.first = `${change.product}|${change.file}`;
 
             qs('.update-row-keys').textContent = diff.keys.join(' ');
@@ -166,6 +166,17 @@
     }
 
     /**
+     * Sets our filters to reflect those in the URL.
+     */
+    function readUrl() {
+        const url = new URL(location.href);
+        document.querySelector('#products-filter').value = url.searchParams.get('products') ?? '';
+        const skipFields = (url.searchParams.get('skipFields') ?? '').split(/\s+/);
+        document.querySelectorAll('.columns-filter')
+            .forEach(checkbox => checkbox.checked = !skipFields.includes(checkbox.value));
+    }
+
+    /**
      * Updates the given/all containers to hide/display rows which match the user's filters. Containers which have no
      * rows visible are themselves hidden.
      *
@@ -210,6 +221,21 @@
                 }
             });
         });
+
+        // Update URL
+        const productsFilter = document.querySelector('#products-filter').value.trim();
+        const params = new URLSearchParams();
+        if (productsFilter !== '') {
+            params.set('products', productsFilter);
+        }
+        if (deniedFields.length) {
+            params.set('skipFields', deniedFields.join(' '));
+        }
+        if (location.search.replace(/^\?/, '') !== params.toString()) {
+            const next = new URL(location.href);
+            next.search = params.toString();
+            history.pushState({}, '', next);
+        }
     }
 
     /**
@@ -217,6 +243,8 @@
      */
     function main() {
         filterSetup();
+        readUrl();
+        window.addEventListener('popstate', () => {readUrl(); updateFilters()});
 
         let lastSequence = 0;
         const socket = new WebSocket('ws://localhost:8001');
@@ -232,5 +260,5 @@
         });
     }
 
-    addEventListener('DOMContentLoaded', () => main());
+    window.addEventListener('DOMContentLoaded', () => main());
 })();
