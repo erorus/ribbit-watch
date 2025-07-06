@@ -1,12 +1,19 @@
 (function () {
+    /**
+     * @typedef {Object} Deets
+     * @property {string} configPath
+     * @property {string} key
+     * @property {string} name
+     */
+
     /** @type {number} The max number of change lists (updates containers) we show on the page. */
     const MAX_UPDATES = 50;
 
     const CDN_HOST = 'https://level3.blizzard.com/';
     const PRODUCT_CONFIG_PATH = 'tpr/configs/data';
 
-    /** @type {Object<string, string>} A map of product => path from cdns endpoint. */
-    let productPaths = {};
+    /** @type {Object<string, Deets>} A map of product => details. */
+    let productDeets = {};
 
     /**
      * Create Element.
@@ -103,7 +110,7 @@
                 case 'BuildConfig':
                 case 'CDNConfig':
                 case 'KeyRing':
-                    const path = productPaths[product];
+                    const path = productDeets[product]?.configPath;
                     if (path) {
                         url = `${CDN_HOST}${path}/config/${value.substring(0, 2)}/${value.substring(2, 4)}/${value}`;
                     }
@@ -125,10 +132,18 @@
         updateMessage.changes.forEach(change => change.diffs.forEach(diff => {
             const row = rowTemplate.content.cloneNode(true);
             const qs = row.querySelector.bind(row);
+            const deets = productDeets[change.product];
             qs('.update-row').dataset.product = change.product;
             qs('.update-row').dataset.field = diff.field;
             qs('.update-row-product-product').textContent = change.product;
             qs('.update-row-product-product').href = `https://github.com/erorus-everynothing/ribbit/blob/${updateMessage.commitHash}/products/${change.product}/${change.file}`;
+            if (deets?.name) {
+                qs('.update-row-product-product').title = deets.name;
+            }
+            if (deets?.key) {
+                qs('.update-row-product-lock').textContent = '🔒';
+                qs('.update-row-product-lock').title = `Encrypted: ${deets.key}`;
+            }
             qs('.update-row-product-file').textContent = change.file !== 'versions' ? `/${change.file}` : '';
             qs('.update-row-product').dataset.first = `${change.product}|${change.file}`;
 
@@ -350,12 +365,8 @@
         window.addEventListener('popstate', () => {readLocation(); updateFilters()});
 
         {
-            const response = await fetch('configPaths.json', {
-                credentials: 'omit',
-                mode: 'same-origin',
-            });
-
-            productPaths = await response.json();
+            const response = await fetch('deets.json', {credentials: 'omit', mode: 'same-origin'});
+            productDeets = await response.json();
         }
 
         let lastSequence = 0;

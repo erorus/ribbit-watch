@@ -4,4 +4,4 @@ current
 node_modules/
 .idea/
 
-site/configPaths.json
+deets/*.json

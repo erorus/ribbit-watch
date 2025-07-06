@@ -5,8 +5,12 @@ $results = [];
 $configPaths = json_decode(file_get_contents(__DIR__ . '/configPaths.json'), true);
 unset($configPaths['-']);
 
-foreach (glob("{$argv[1]}/*") as $path) {
-    $json = file_get_contents($path);
+$hashMap = [];
+$tempPath = $argv[1];
+foreach (file("{$tempPath}/map.txt") as $line) {
+    [$hash, $product] = explode(' ', trim($line), 2);
+
+    $json = file_get_contents("{$tempPath}/{$hash}");
     $parsed = json_decode($json);
     if (json_last_error() !== JSON_ERROR_NONE) {
         fwrite(STDERR, "{$path} was not json\n");
@@ -14,12 +18,6 @@ foreach (glob("{$argv[1]}/*") as $path) {
     }
 
     $result = [];
-    if (isset($parsed->all->config->product)) {
-        $product = strtolower($parsed->all->config->product);
-    } else {
-        fwrite(STDERR, "{$path} has no product\n");
-        continue;
-    }
 
     if (isset($configPaths[$product])) {
         $result['configPath'] = $configPaths[$product];

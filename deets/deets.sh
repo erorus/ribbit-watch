@@ -3,6 +3,7 @@
 set -e
 
 cd "$(dirname ${BASH_SOURCE[0]})"
+homeDir="$(pwd)"
 configPathsJson=$(readlink -m "configPaths.json")
 
 cd ../current/products
@@ -22,9 +23,14 @@ tempdir=$(mktemp -d)
 echo "Created temp dir $tempdir"
 
 for pth in `find ./ -name 'versions' -printf '%P\n' | sort -V`; do
+  product=$(dirname $pth)
   hash=$(grep '^us|' $pth | awk -F '|' '{print $7}')
+  if [ "$hash" == "" ]; then
+    hash=$(grep -A 1 '^## seqn = ' $pth | tail -n 1 | awk -F '|' '{print $7}')
+  fi
   if [ "$hash" != "" ]; then
     echo "https://level3.blizzard.com/tpr/configs/data/${hash:0:2}/${hash:2:2}/$hash" >> "$tempdir/urls.txt"
+    echo "$hash $product" >> "$tempdir/map.txt"
   fi
 done
 
@@ -34,7 +40,7 @@ wget -i urls.txt
 rm urls.txt
 
 echo "Generating deets"
-cd "$(dirname ${BASH_SOURCE[0]})"
+cd "$homeDir"
 php deets.php "$tempdir" > deets.json.tmp
 mv deets.json.tmp deets.json
 
