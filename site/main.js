@@ -219,10 +219,6 @@
             className: 'updates-list-container',
             dataset: {sequence: `${updateMessage.sequence}`},
         });
-        if (transitioningNewUpdates) {
-            surround.style.opacity = '0';
-            surround.style.maxHeight = '0';
-        }
         // Add the header to the surround.
         {
             const header = qs('#update-header').content.cloneNode(true);
@@ -240,6 +236,19 @@
         surround.appendChild(table);
         updateFilters(surround);
 
+        const visibleProducts = Array.from(new Set(
+            Array.from(surround.querySelectorAll('.update-row:not(.filtered)')).map(row => row.dataset.product)
+        )).sort((a, b) => a.localeCompare(b)).join(', ');
+
+        const doTransition = transitioningNewUpdates &&
+            visibleProducts.length > 0 &&
+            document.visibilityState === 'visible';
+
+        if (doTransition) {
+            surround.style.opacity = '0';
+            surround.style.maxHeight = '0';
+        }
+
         // Add surround to parent and sort surrounds.
         listParent.insertBefore(surround, listParent.firstChild);
         const surroundSequences = Array.from(listParent.querySelectorAll(':scope > .updates-list-container'))
@@ -254,7 +263,7 @@
             listParent.removeChild(listParent.lastChild);
         }
 
-        if (transitioningNewUpdates) {
+        if (doTransition) {
             const finishedHandler = event => {
                 if (event.propertyName === 'max-height') {
                     surround.style.maxHeight = '';
@@ -275,20 +284,18 @@
         }
 
         // Notifications
-        if (updateMessage.timestamp + NOTIFICATION_WINDOW > Date.now() && qs('#notifications-input').checked) {
-            const products = Array.from(new Set(
-                Array.from(surround.querySelectorAll('.update-row:not(.filtered)')).map(row => row.dataset.product)
-            )).sort((a, b) => a.localeCompare(b)).join(', ');
-
-            if (products.length) {
-                new Notification('Ribbit Watch', {
-                    body: `New Ribbit Update for ${products}`,
-                    icon: (new URL('inv_frog2_darkgreen.jpg', location.href)).toString(),
-                    silent: true,
-                    tag: 'ribbit',
-                });
-                playAudio();
-            }
+        if (
+            visibleProducts.length > 0 &&
+            updateMessage.timestamp + NOTIFICATION_WINDOW > Date.now() &&
+            qs('#notifications-input').checked
+        ) {
+            new Notification('Ribbit Watch', {
+                body: `New Ribbit Update for ${visibleProducts}`,
+                icon: (new URL('inv_frog2_darkgreen.jpg', location.href)).toString(),
+                silent: true,
+                tag: 'ribbit',
+            });
+            playAudio();
         }
     }
 
