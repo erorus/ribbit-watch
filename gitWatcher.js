@@ -34,7 +34,7 @@ module.exports = function (gitDir) {
             const headContent = fs.readFileSync(headPath, 'utf8').trim();
             if (headContent.startsWith('ref:')) {
                 const refPath = Path.join(gitDir, headContent.substring(5));
-                activeRefWatcher = watchFile(refPath, updateCommit);
+                activeRefWatcher = watchFile(refPath, handleHeadChange);
             } else {
                 activeRefWatcher = null;
             }
