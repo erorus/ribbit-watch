@@ -154,7 +154,7 @@ async function main() {
     server.listen(PORT, '127.0.0.1', () => logMsg(`Server started on port ${PORT}.`));
 
     logMsg('Watching for new commits.');
-    await gitWatcher.watchHead(async (commit) => {
+    gitWatcher.watchHead(async (commit) => {
         logMsg(`Detected new commit: ${commit}`);
 
         const shortCommit = await git.getCommit(commit);

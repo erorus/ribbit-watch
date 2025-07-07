@@ -7,25 +7,25 @@ const Path = require('node:path');
 module.exports = function (gitDir) {
     const headPath = Path.join(gitDir, 'HEAD');
 
-    let lastCommit = null;
-    let activeRefWatcher = null;
+    this.watchHead = function (onCommitChange) {
+        let lastCommit = null;
 
-    this.watchHead = async function (onCommitChange) {
+        let activeRefWatcher = null;
         let headWatcher;
 
-        async function updateCommit() {
+        function updateCommit() {
             const current = getHeadCommit();
             if (current !== lastCommit) {
                 const wasNull = lastCommit == null;
                 lastCommit = current;
 
                 if (!wasNull) {
-                    await onCommitChange(current);
+                    onCommitChange(current);
                 }
             }
         }
 
-        async function handleHeadChange() {
+        function handleHeadChange() {
             headWatcher?.();
             activeRefWatcher?.();
 
@@ -39,10 +39,10 @@ module.exports = function (gitDir) {
                 activeRefWatcher = null;
             }
 
-            await updateCommit();
+            updateCommit();
         }
 
-        await handleHeadChange();
+        handleHeadChange();
     };
 
     /**
@@ -69,7 +69,7 @@ module.exports = function (gitDir) {
      * @returns {function} Closer
      */
     function watchFile(path, onChange) {
-        const watcher = fs.watch(path, undefined, async () => await onChange());
+        const watcher = fs.watch(path, undefined, () => void (onChange()));
         return () => watcher.close();
     }
 };
