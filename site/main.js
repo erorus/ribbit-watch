@@ -249,7 +249,7 @@
             listParent.removeChild(listParent.lastChild);
         }
 
-        if (document.visibilityState === 'hidden') {
+        if (visibleProducts.length && document.visibilityState === 'hidden') {
             pendingCount++;
             document.title = `(${pendingCount}) ` + document.title.replace(/^\(\d+\)\s*/, '');
             surround.classList.add('pending');
