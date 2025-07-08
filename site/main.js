@@ -30,9 +30,6 @@
     /** @type {WebSocket} */
     let socket;
 
-    /** @type {boolean} True when we will use CSS transitions for new updates. */
-    let transitioningNewUpdates = false;
-
     /**
      * Create Element.
      *
@@ -90,11 +87,9 @@
             qs('#online-indicator').dataset.online = 'on';
             document.title = document.title.replace(/ \(Offline\)/, '');
             qs('#icon-link').href = 'green.png';
-            window.setTimeout(() => void (transitioningNewUpdates = true), 5000);
         };
 
         const showOffline = () => {
-            transitioningNewUpdates = false;
             socket?.close();
             qs('#online-indicator').dataset.online = 'off';
             document.title = document.title.replace(/ \(Offline\)/, '') + ' (Offline)';
@@ -240,15 +235,6 @@
             Array.from(surround.querySelectorAll('.update-row:not(.filtered)')).map(row => row.dataset.product)
         )).sort((a, b) => a.localeCompare(b)).join(', ');
 
-        const doTransition = transitioningNewUpdates &&
-            visibleProducts.length > 0 &&
-            document.visibilityState === 'visible';
-
-        if (doTransition) {
-            surround.style.opacity = '0';
-            surround.style.maxHeight = '0';
-        }
-
         // Add surround to parent and sort surrounds.
         listParent.insertBefore(surround, listParent.firstChild);
         const surroundSequences = Array.from(listParent.querySelectorAll(':scope > .updates-list-container'))
@@ -261,20 +247,6 @@
         }
         while (listParent.children.length > MAX_UPDATES) {
             listParent.removeChild(listParent.lastChild);
-        }
-
-        if (doTransition) {
-            const finishedHandler = event => {
-                if (event.propertyName === 'max-height') {
-                    surround.style.maxHeight = '';
-                    surround.removeEventListener('transitionend', finishedHandler);
-                }
-            };
-            window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
-                surround.addEventListener('transitionend', finishedHandler);
-                surround.style.maxHeight = surround.scrollHeight + 'px';
-                surround.style.opacity = '';
-            }));
         }
 
         if (document.visibilityState === 'hidden') {
