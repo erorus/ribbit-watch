@@ -16,7 +16,7 @@ input[data-invalid] {background-color: #f88}
 
 .updates-list-container, .filter-container {
     background-color: #ddd;
-    border: 1px solid #111;
+    border: 1px solid #aaa;
     border-radius: 5px;
 }
 .updates-list-container, .major-section {
