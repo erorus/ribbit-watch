@@ -96,25 +96,30 @@ async function getChanges(ref = 'HEAD') {
 
     await Promise.all(paths.map(async (path) => {
         const logMessages = [`Processing ${ref} ${path}`];
-        const pathParts = path.split('/');
+        const [product, file] = path.split('/').slice(1);
+        const disposition = ({
+            'bgdl': 'version',
+            'cdns': 'cdn',
+            'versions': 'version',
+        })[file];
 
         let prevLines = {};
         let curLines = {};
 
         try {
-            prevLines = ribbitVersions.getVersionLines(await git.getFile(`${ref}^`, path));
+            prevLines = ribbitVersions.getVersionLines(await git.getFile(`${ref}^`, path), disposition);
         } catch (e) {
             logMessages.push(`Failed getting [${path}] at [${ref}^]: ${e.message}`);
         }
         try {
-            curLines = ribbitVersions.getVersionLines(await git.getFile(ref, path));
+            curLines = ribbitVersions.getVersionLines(await git.getFile(ref, path), disposition);
         } catch (e) {
             logMessages.push(`Failed getting [${path}] at [${ref}]: ${e.message}`);
         }
 
         results.push({
-            product: pathParts[1],
-            file: pathParts[2],
+            product,
+            file,
             diffs: ribbitVersions.diffVersionLines(prevLines, curLines),
         });
         logMessages.forEach(logMsg);
