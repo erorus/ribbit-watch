@@ -13,15 +13,16 @@ module.exports = function (gitDir) {
         let activeRefWatcher = null;
         let headWatcher;
 
-        function updateCommit() {
-            const current = getHeadCommit();
-            if (current !== lastCommit) {
-                const wasNull = lastCommit == null;
-                lastCommit = current;
+        function updateCommit(currentCommit) {
+            if (currentCommit === lastCommit) {
+                return;
+            }
 
-                if (!wasNull) {
-                    onCommitChange(current);
-                }
+            const wasNull = lastCommit == null;
+            lastCommit = currentCommit;
+
+            if (!wasNull) {
+                onCommitChange(currentCommit);
             }
         }
 
@@ -29,36 +30,31 @@ module.exports = function (gitDir) {
             headWatcher?.();
             activeRefWatcher?.();
 
+            const [currentCommit, refPath] = getHeadCommit();
+
             headWatcher = watchFile(headPath, handleHeadChange);
+            activeRefWatcher = refPath ? watchFile(refPath, handleHeadChange) : null;
 
-            const headContent = fs.readFileSync(headPath, 'utf8').trim();
-            if (headContent.startsWith('ref:')) {
-                const refPath = Path.join(gitDir, headContent.substring(5));
-                activeRefWatcher = watchFile(refPath, handleHeadChange);
-            } else {
-                activeRefWatcher = null;
-            }
-
-            updateCommit();
+            updateCommit(currentCommit);
         }
 
         handleHeadChange();
     };
 
     /**
-     * Returns the full commit hash where HEAD currently points.
+     * Returns the full commit hash where HEAD currently points, and the ref path we had to check to get it.
      *
-     * @returns {string}
+     * @returns {[string, string|undefined]}
      */
     function getHeadCommit() {
         const headContent = fs.readFileSync(headPath, 'utf8').trim();
         if (headContent.startsWith('ref:')) {
             const refPath = Path.join(gitDir, headContent.substring(5));
 
-            return fs.readFileSync(refPath, 'utf8').trim();
+            return [fs.readFileSync(refPath, 'utf8').trim(), refPath];
         }
 
-        return headContent;
+        return [headContent, undefined];
     }
 
     /**
