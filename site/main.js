@@ -115,8 +115,8 @@
      */
     function makeDate(timestamp) {
         const shortFormatter = new Intl.DateTimeFormat([], {
-            weekday: 'short',
-            month: 'short',
+            weekday: 'long',
+            month: 'long',
             day: 'numeric',
             hour: 'numeric',
             minute: '2-digit',
