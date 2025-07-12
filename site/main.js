@@ -120,6 +120,7 @@
             day: 'numeric',
             hour: 'numeric',
             minute: '2-digit',
+            timeZoneName: 'short',
         });
 
         return shortFormatter.format(new Date(timestamp))
