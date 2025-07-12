@@ -19,6 +19,7 @@ cleanup() {
     echo
     echo "Resetting to latest commit..."
     git checkout "${COMMITS[-1]}" >/dev/null
+    touch ../last-commit-time
     echo "Now at latest commit."
     exit
 }
@@ -26,6 +27,7 @@ trap cleanup INT
 
 echo "Starting at commit: ${COMMITS[0]}"
 git checkout "${COMMITS[0]}" >/dev/null
+touch ../last-commit-time
 
 # Step forward through the commits
 for (( i=1; i<N; i++ )); do
@@ -33,6 +35,7 @@ for (( i=1; i<N; i++ )); do
     echo "Press any key to advance to next commit ($((i+1)) of $N)..."
     read -n 1 -s
     git checkout "${COMMITS[$i]}" >/dev/null
+    touch ../last-commit-time
     echo "Now at: $(git log --oneline -1)"
 done
 

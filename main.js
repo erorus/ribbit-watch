@@ -1,4 +1,5 @@
 const dateFormat = require('dateformat');
+const fs = require('node:fs');
 const Path = require('node:path');
 const { createServer } = require('node:http');
 const { WebSocketServer } = require('ws');
@@ -6,11 +7,11 @@ const { WebSocketServer } = require('ws');
 const gitDir = Path.join(__dirname, 'current', '.git');
 
 const git = new (require('./git'))(gitDir);
-const gitWatcher = new (require('./gitWatcher'))(gitDir);
 const ribbitVersions = require('./ribbitVersions');
 
 const BACKLOG_COMMITS = 50;
 const PORT = 8001;
+const COMMIT_WATCH_PATH = Path.join(__dirname, 'last-commit-time');
 
 /**
  * @typedef {Object} FileChanges
@@ -131,6 +132,30 @@ async function getChanges(ref = 'HEAD') {
     return results;
 }
 
+/**
+ * Initializes the watcher for new commits.
+ *
+ * @param {function} onNewCommit
+ */
+function setupWatcher(onNewCommit) {
+    let closer;
+    let lastCommit;
+    const onChange = async () => {
+        closer?.();
+        const curCommit = await git.getCommit();
+        const wasUpdated = lastCommit != null && curCommit !== lastCommit;
+        lastCommit = curCommit;
+        if (wasUpdated) {
+            onNewCommit(curCommit);
+        }
+
+        const watcher = fs.watch(COMMIT_WATCH_PATH, undefined, () => void onChange());
+        closer = () => watcher.close();
+    };
+
+    onChange();
+}
+
 async function main() {
     logMsg('Filling backlog.');
     const backlog = await getBacklog();
@@ -158,8 +183,7 @@ async function main() {
     wss.on('close', () => clearInterval(pingInterval));
     server.listen(PORT, '127.0.0.1', () => logMsg(`Server started on port ${PORT}.`));
 
-    logMsg('Watching for new commits.');
-    gitWatcher.watchHead(async (commit) => {
+    const handleNewCommit = async (commit) => {
         logMsg(`Detected new commit: ${commit}`);
 
         const shortCommit = await git.getCommit(commit);
@@ -177,7 +201,9 @@ async function main() {
 
         logMsg(msg);
         wss.clients.forEach(ws => ws.send(JSON.stringify(msg)));
-    });
+    };
+
+    setupWatcher(handleNewCommit);
 
     logMsg('Ready.');
 }
