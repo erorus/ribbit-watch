@@ -256,15 +256,20 @@
             listParent.removeChild(listParent.lastChild);
         }
 
-        if (visibleProducts.length && document.visibilityState === 'hidden') {
+        if (!visibleProducts.length) {
+            return;
+        }
+
+        if (document.visibilityState === 'hidden') {
             pendingCount++;
             document.title = `(${pendingCount}) ` + document.title.replace(/^\(\d+\)\s*/, '');
             surround.classList.add('pending');
+        } else if (location.hash.replace(/^#/, '') === surround.dataset.sequence) {
+            surround.scrollIntoView();
         }
 
         // Notifications
         if (
-            visibleProducts.length > 0 &&
             updateMessage.timestamp + NOTIFICATION_WINDOW > Date.now() &&
             qs('#notifications-input').checked
         ) {
