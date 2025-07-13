@@ -2,7 +2,6 @@ const dateFormat = require('dateformat');
 const fs = require('node:fs');
 const Path = require('node:path');
 const { createServer } = require('node:http');
-const { WebSocketServer } = require('ws');
 
 const gitDir = Path.join(__dirname, 'current', '.git');
 
@@ -158,40 +157,6 @@ function setupWatcher(onNewCommit) {
 }
 
 /**
- * Starts the websocket server, returning a function which broadcasts a message.
- *
- * @param {UpdateMessage[]} backlog
- * @return {function}
- */
-function startWebsocketServer(backlog) {
-    logMsg('Starting websocket server.');
-    const server = createServer()
-    const wss = new WebSocketServer({ server });
-    wss.on('connection', ws => {
-        ws.on('error', message => logMsg(`WebSocket error: ${message}`));
-        ws.on('pong', () => void (ws.isAlive = true));
-        backlog.forEach(message => ws.send(JSON.stringify(message)));
-    });
-    const pingInterval = setInterval(() => {
-        wss.clients.forEach(ws => {
-            if (ws.isAlive === false) {
-                return ws.terminate();
-            }
-
-            ws.isAlive = false;
-            ws.ping();
-        });
-    }, 30000);
-    wss.on('close', () => clearInterval(pingInterval));
-    server.listen(WEBSOCKET_PORT, '127.0.0.1', () => logMsg(`Websocket server started on port ${WEBSOCKET_PORT}.`));
-
-    return msg => {
-        const composed = JSON.stringify(msg);
-        wss.clients.forEach(ws => ws.send(composed));
-    };
-}
-
-/**
  * Starts the server-sent events server, returning a function which broadcasts a message.
  *
  * @param {UpdateMessage[]} backlog
@@ -236,7 +201,6 @@ async function main() {
     const sortBacklog = () => backlog.sort((a, b) => a.sequence - b.sequence);
     sortBacklog();
 
-    const wssSend = startWebsocketServer(backlog);
     const sseSend = startSSEServer(backlog);
 
     const handleNewCommit = async (commit) => {
@@ -256,7 +220,6 @@ async function main() {
         backlog.splice(0, backlog.length - BACKLOG_COMMITS);
 
         logMsg(msg);
-        wssSend(msg);
         sseSend(msg);
     };
 

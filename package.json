@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "dateformat": "^3.0.3",
-    "ws": "^8.18.3"
+    "dateformat": "^3.0.3"
   }
 }
