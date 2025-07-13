@@ -9,8 +9,8 @@ const git = new (require('./git'))(gitDir);
 const ribbitVersions = require('./ribbitVersions');
 
 const BACKLOG_COMMITS = 50;
-const WEBSOCKET_PORT = 8001;
 const SSE_PORT = 8002;
+const SSE_KEEPALIVE_INTERVAL = 25000;
 const COMMIT_WATCH_PATH = Path.join(__dirname, 'last-commit-time');
 
 /**
@@ -178,8 +178,13 @@ function startSSEServer(backlog) {
         res.writeHead(200, headers);
         backlog.forEach(message => res.write(compose(message)));
 
+        const keepaliveInterval = setInterval(
+            () => void res.write(': keep-alive\n\n'),
+            SSE_KEEPALIVE_INTERVAL,
+        );
         clients.push(res);
-        req.on('close', () => {
+        res.on('close', () => {
+            clearInterval(keepaliveInterval);
             const idx = clients.indexOf(res);
             if (idx !== -1) {
                 clients.splice(idx, 1);
