@@ -27,8 +27,11 @@
     /** @type {Object<string, Deets>} A map of product => details. */
     let productDeets = {};
 
-    /** @type {WebSocket} */
-    let socket;
+    /** @type {EventSource} */
+    let eventSource;
+
+    /** @type {number} */
+    let eventSourceTimeout;
 
     /**
      * Create Element.
@@ -82,29 +85,32 @@
     /**
      * Connects to the websocket to listen for events.
      */
-    function connect() {
+    function connect(retryCounter = 0) {
+        window.clearTimeout(eventSourceTimeout);
+
         const showOnline = () => {
+            retryCounter = 0;
             qs('#online-indicator').dataset.online = 'on';
             document.title = document.title.replace(/ \(Offline\)/, '');
             qs('#icon-link').href = 'green.png';
         };
 
         const showOffline = () => {
-            socket?.close();
+            eventSource?.close();
             qs('#online-indicator').dataset.online = 'off';
             document.title = document.title.replace(/ \(Offline\)/, '') + ' (Offline)';
             qs('#icon-link').href = 'red.png';
         };
 
         showOffline();
-        socket = new WebSocket(location.hostname === '127.0.0.1' ?
-            'ws://localhost:8001' :
-            `wss://${location.hostname}/updates`,
-        );
-        socket.addEventListener('open', showOnline);
-        socket.addEventListener('close', showOffline);
-        socket.addEventListener('error', showOffline);
-        socket.addEventListener('message', event => void logChanges(JSON.parse(event.data)));
+        eventSource = new EventSource(location.hostname === '127.0.0.1' ? 'http://localhost:8002' : `./events`);
+        eventSource.addEventListener('open', showOnline);
+        eventSource.addEventListener('error', () => {
+            showOffline();
+            retryCounter = Math.min(retryCounter + 1, 5);
+            eventSourceTimeout = window.setTimeout(() => connect(retryCounter), 1000 * 2 ** retryCounter);
+        });
+        eventSource.addEventListener('message', event => void logChanges(JSON.parse(event.data)));
     }
 
     /**
@@ -558,7 +564,7 @@
             }
         });
 
-        qs('#online-connect').addEventListener('click', connect);
+        qs('#online-connect').addEventListener('click', () => void connect());
         connect();
     }
 

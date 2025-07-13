@@ -10,7 +10,8 @@ const git = new (require('./git'))(gitDir);
 const ribbitVersions = require('./ribbitVersions');
 
 const BACKLOG_COMMITS = 50;
-const PORT = 8001;
+const WEBSOCKET_PORT = 8001;
+const SSE_PORT = 8002;
 const COMMIT_WATCH_PATH = Path.join(__dirname, 'last-commit-time');
 
 /**
@@ -156,13 +157,14 @@ function setupWatcher(onNewCommit) {
     onChange();
 }
 
-async function main() {
-    logMsg('Filling backlog.');
-    const backlog = await getBacklog();
-    const sortBacklog = () => backlog.sort((a, b) => a.sequence - b.sequence);
-    sortBacklog();
-
-    logMsg('Starting server.');
+/**
+ * Starts the websocket server, returning a function which broadcasts a message.
+ *
+ * @param {UpdateMessage[]} backlog
+ * @return {function}
+ */
+function startWebsocketServer(backlog) {
+    logMsg('Starting websocket server.');
     const server = createServer()
     const wss = new WebSocketServer({ server });
     wss.on('connection', ws => {
@@ -181,7 +183,61 @@ async function main() {
         });
     }, 30000);
     wss.on('close', () => clearInterval(pingInterval));
-    server.listen(PORT, '127.0.0.1', () => logMsg(`Server started on port ${PORT}.`));
+    server.listen(WEBSOCKET_PORT, '127.0.0.1', () => logMsg(`Websocket server started on port ${WEBSOCKET_PORT}.`));
+
+    return msg => {
+        const composed = JSON.stringify(msg);
+        wss.clients.forEach(ws => ws.send(composed));
+    };
+}
+
+/**
+ * Starts the server-sent events server, returning a function which broadcasts a message.
+ *
+ * @param {UpdateMessage[]} backlog
+ * @return {function}
+ */
+function startSSEServer(backlog) {
+    const clients = [];
+    const compose = msg => 'data: ' + JSON.stringify(msg) + '\n\n';
+
+    const server = createServer((req, res) => {
+        const headers = {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+        };
+        if (req.headers['origin'] === 'http://127.0.0.1:7777') {
+            headers['Access-Control-Allow-Origin'] = req.headers['origin'];
+        }
+        res.writeHead(200, headers);
+        backlog.forEach(message => res.write(compose(message)));
+
+        clients.push(res);
+        req.on('close', () => {
+            const idx = clients.indexOf(res);
+            if (idx !== -1) {
+                clients.splice(idx, 1);
+            }
+        });
+    });
+
+    server.listen(SSE_PORT, '127.0.0.1', () => logMsg(`SSE server started on port ${SSE_PORT}.`));
+
+    return msg => {
+        const composed = compose(msg);
+        clients.forEach(client => client.write(composed));
+    };
+}
+
+async function main() {
+    logMsg('Filling backlog.');
+    const backlog = await getBacklog();
+    const sortBacklog = () => backlog.sort((a, b) => a.sequence - b.sequence);
+    sortBacklog();
+
+    const wssSend = startWebsocketServer(backlog);
+    const sseSend = startSSEServer(backlog);
 
     const handleNewCommit = async (commit) => {
         logMsg(`Detected new commit: ${commit}`);
@@ -200,7 +256,8 @@ async function main() {
         backlog.splice(0, backlog.length - BACKLOG_COMMITS);
 
         logMsg(msg);
-        wss.clients.forEach(ws => ws.send(JSON.stringify(msg)));
+        wssSend(msg);
+        sseSend(msg);
     };
 
     setupWatcher(handleNewCommit);
