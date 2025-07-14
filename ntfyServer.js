@@ -1,0 +1,205 @@
+const dateFormat = require('dateformat');
+const { createServer } = require('node:http');
+
+/**
+ * @param {UpdateMessage[]} backlog
+ */
+module.exports = function (backlog) {
+    const NTFY_PORT = 8003;
+    const KEEPALIVE_INTERVAL = 25000;
+
+    /**
+     * @typedef {Object} NtfyClient
+     * @property {ServerResponse} res
+     * @property {string} topic
+     */
+
+    /** @type {NtfyClient[]} */
+    const clients = [];
+
+    /**
+     * Prints a message to the log.
+     *
+     * @param {string} message
+     */
+    function logMsg(message) {
+        const date = dateFormat(new Date(), 'yyyy-mm-dd HH:MM:ss');
+        console.log(date, message);
+    }
+
+    /**
+     * Ensures we have the required properties on a Ntfy message, then returns it as a json string.
+     *
+     * @param {Object} msg
+     * @return {string}
+     */
+    const encodeNtfyMessage = msg => {
+        msg.id ??= [...Array(12)].map(() =>
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+                .charAt(Math.floor(Math.random() * 62))
+        ).join('');
+
+        msg.time ??= Date.now();
+        if (msg.time > 10000000000) {
+            msg.time = Math.floor(msg.time / 1000);
+        }
+
+        return JSON.stringify(msg) + '\n';
+    };
+
+    /**
+     * Converts an update message into a ntfy message.
+     *
+     * @param {UpdateMessage} msg
+     */
+    const compose = msg => {
+        const padNumbers = str => str.replace(/\d+/g, num => num.padStart(4, '0'));
+
+        return {
+            'event': 'message',
+            'tags': ['frog'],
+            'id': `seq${msg.sequence}`,
+            'time': msg.timestamp,
+            'title': 'Ribbit Watch',
+            'message': 'New Ribbit Update for ' +
+                Array.from((new Set(msg.changes.map(change => change.product + (change.file !== 'versions' ? `/${change.file}` : '')))).values())
+                    .sort((a, b) => padNumbers(a).localeCompare(padNumbers(b)))
+                    .join(', '),
+        };
+    };
+
+    /**
+     * Returns the value under the key with one of the given names from the ntfy request.
+     *
+     * @param {Object} req
+     * @param {string[]} names
+     * @return {*}
+     */
+    const getParam = (req, names) => {
+        const url = new URL(`http://localhost${req.url}`);
+
+        return names
+            .map(name => name.toLowerCase())
+            .map(name =>
+                Array.from(url.searchParams.entries())
+                    .find(([key]) => key.toLowerCase() === name)?.[1] ??
+                req.headers[name])
+            .find(value => value != null);
+    };
+
+    /**
+     * Handles a request from the HTTP server.
+     *
+     * @param {Object} req
+     * @param {Object} res
+     */
+    const handleRequest = (req, res) => {
+        logMsg('Incoming ntfy request at ' + req.url);
+
+        const abort = () => {
+            res.writeHead(404);
+            res.end();
+        };
+
+        const url = new URL(`http://localhost${req.url}`);
+        const match = url.pathname.match(/^\/([^\/]+)\/([^\/]+)$/);
+        if (!match) {
+            return abort();
+        }
+        const [topic, action] = match.slice(1);
+
+        if (action !== 'json') {
+            return abort();
+        }
+
+        const oneShot = getParam(req, ['poll', 'x-poll', 'po']) != null;
+        const since = getParam(req, ['since', 'x-since', 'si']);
+
+        const headers = {
+            'Content-Type': 'application/x-ndjson; charset=utf-8',
+            'Cache-Control': 'no-cache',
+        };
+        res.writeHead(200, headers);
+
+        if (!oneShot) {
+            res.write(encodeNtfyMessage({'event': 'open', topic}));
+        }
+
+        // print old messages
+        if (backlog.length) {
+            let sinceTimestamp;
+            let sinceSequence;
+
+            if (since) {
+                const match = since.match(/^(\d+)(ms|s|m|h|d)$/);
+                if (match) {
+                    const [, amount, unit] = match;
+                    const n = parseInt(amount, 10);
+
+                    switch (unit) {
+                        case 'ms':
+                            sinceTimestamp = n;
+                        case 's':
+                            sinceTimestamp = n * 1000;
+                        case 'm':
+                            sinceTimestamp = n * 60 * 1000;
+                        case 'h':
+                            sinceTimestamp = n * 60 * 60 * 1000;
+                        case 'd':
+                            sinceTimestamp = n * 24 * 60 * 60 * 1000;
+                    }
+                } else
+                    if (/^\d+$/.test(since)) {
+                        sinceTimestamp = parseInt(since) * 1000;
+                    } else
+                        if (/^seq(\d+)$/.test(since)) {
+                            sinceSequence = parseInt(since.substring(3));
+                        }
+            }
+
+            {
+                let catchUp = [];
+                if (since === 'latest') {
+                    catchUp.push(backlog[backlog.length - 1]);
+                } else if (since != null) {
+                    catchUp = backlog.filter(message =>
+                        message.timestamp > (sinceTimestamp ?? 0) &&
+                        message.sequence > (sinceSequence ?? 0)
+                    );
+                }
+
+                catchUp.forEach(msg => res.write(encodeNtfyMessage({topic, ...compose(msg)})));
+            }
+        }
+
+        if (oneShot) {
+            res.end();
+
+            return;
+        }
+
+        const keepaliveInterval = setInterval(
+            () => void res.write(encodeNtfyMessage({'event': 'keepalive', topic})),
+            KEEPALIVE_INTERVAL,
+        );
+        clients.push({res, topic});
+        res.on('close', () => {
+            clearInterval(keepaliveInterval);
+
+            const idx = clients.findIndex(entry => entry.res === res);
+            if (idx !== -1) {
+                clients.splice(idx, 1);
+            }
+        });
+    };
+
+    {
+        const server = createServer(handleRequest);
+        server.listen(NTFY_PORT, undefined, () => logMsg(`Ntfy.sh server started on port ${NTFY_PORT}.`));
+    }
+
+    this.send = msg => {
+        const composed = compose(msg);
+        clients.forEach(client => client.res.write(encodeNtfyMessage({...composed, topic: client.topic})));
+    };
+};
