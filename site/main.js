@@ -522,6 +522,35 @@
                 checkbox.checked = false;
             }
         });
+
+        qs('#notifications-ntfy').addEventListener('click', () => {
+            let num = 0;
+            qsa('.filter-container input[type="checkbox"][data-ntfy]').forEach(checkbox => {
+                const pos = parseInt(checkbox.dataset.ntfy);
+                if (checkbox.checked !== checkbox.defaultChecked) {
+                    num = num | (1 << (pos - 1));
+                }
+            });
+
+            let topic = (num << 4).toString(16) + '-' + encodeURIComponent(qs('#products-filter').value.trim())
+                .replace(/-/g, '--')
+                .replace(/_/g, '-_')
+                .replace(/%20/g, '_')
+                .replace(/[^0-9A-Za-z_%-]/g, symbol => '-' + symbol.charCodeAt(0).toString(16))
+                .replace(/%/g, '-');
+
+            if (topic.length > 64) {
+                alert('Products filter too long. Remove some products to produce a ntfy.sh topic.');
+
+                return;
+            }
+
+            prompt([
+                'You can get notifications on your phone by installing the ntfy app.',
+                'Once installed, subscribe to a topic. Check "Use another server" and put in https://ntfy.ribbit.watch',
+                'Then, for the topic name, enter the text below:'
+            ].join('\n\n'), topic);
+        });
     }
 
     /**
