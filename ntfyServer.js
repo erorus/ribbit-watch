@@ -228,7 +228,7 @@ module.exports = function (backlog) {
      * @param {function} write
      */
     const handleSince = (since, write) => {
-        if (!backlog.length || since == null) {
+        if (!backlog.length || since == null || since === 'none') {
             return;
         }
 
