@@ -23,6 +23,7 @@ module.exports = function (backlog) {
 
     /**
      * @typedef {Object} TopicFilters
+     * @property {string} productsFilter
      * @property {RegExp} productsRegex
      * @property {number} flags
      * @property {number} version
@@ -78,12 +79,13 @@ module.exports = function (backlog) {
      * Converts an update message into a ntfy message.
      *
      * @param {UpdateMessage} msg
-     * @param {string[]} products
+     * @param {TopicFilters} filters
      * @returns {Object|undefined}
      */
-    const compose = (msg, products) => {
+    const compose = (msg, filters) => {
         const padNumbers = str => str.replace(/\d+/g, num => num.padStart(4, '0'));
 
+        const products = getShownProducts(msg, filters);
         const paths = Array.from(
             (
                 new Set(
@@ -98,12 +100,27 @@ module.exports = function (backlog) {
             return;
         }
 
+        const params = new URLSearchParams();
+        if (filters.productsFilter !== '') {
+            params.set('products', filters.productsFilter);
+        }
+        const deniedFields = getDeniedFields(filters);
+        if (deniedFields.length) {
+            params.set('skipFields', deniedFields.join(' '));
+        }
+        if (filters.flags & 0x1) {
+            params.set('encrypted', 'no');
+        }
+
+        const click = new URL(`https://ribbit.watch/#${msg.sequence}`);
+        click.search = params.toString();
+
         return {
             'event': 'message',
             'tags': ['frog'],
             'id': `seq${msg.sequence}`,
             'time': msg.timestamp,
-            'click': `https://ribbit.watch/#${msg.sequence}`,
+            'click': click.toString(),
             'title': 'Ribbit Watch',
             'message': 'New Ribbit Update for ' + paths
                 .sort((a, b) => padNumbers(a).localeCompare(padNumbers(b)))
@@ -317,7 +334,7 @@ module.exports = function (backlog) {
                 );
             }
 
-            catchUp.forEach(msg => void write(compose(msg, getShownProducts(msg, filters))));
+            catchUp.forEach(msg => void write(compose(msg, filters)));
         }
     };
 
@@ -348,6 +365,7 @@ module.exports = function (backlog) {
         return {
             version,
             flags,
+            productsFilter,
             productsRegex,
         };
     };
@@ -377,14 +395,12 @@ module.exports = function (backlog) {
     };
 
     /**
-     * Returns a list of products which would be shown in an alert from the given message, after the given filters.
+     * Returns a list of denied fields from the given filters.
      *
-     * @param {UpdateMessage} msg
      * @param {TopicFilters} filters
-     * @returns {string[]}
+     * @return {string[]}
      */
-    const getShownProducts = (msg, filters) => {
-        const encryptedExcluded = filters.flags & 0x1;
+    const getDeniedFields = filters => {
         const fieldFlags = {
             'BuildConfig'  : 0x2,
             'CDNConfig'    : 0x4,
@@ -397,9 +413,22 @@ module.exports = function (backlog) {
             'Servers'      : 0x200,
             'ConfigPath'   : 0x400,
         };
-        const deniedFields = Object.entries(fieldFlags)
+
+        return Object.entries(fieldFlags)
             .filter(([field, flag]) => !!(filters.flags & flag))
             .map(([field, flag]) => field);
+    }
+
+    /**
+     * Returns a list of products which would be shown in an alert from the given message, after the given filters.
+     *
+     * @param {UpdateMessage} msg
+     * @param {TopicFilters} filters
+     * @returns {string[]}
+     */
+    const getShownProducts = (msg, filters) => {
+        const encryptedExcluded = filters.flags & 0x1;
+        const deniedFields = getDeniedFields(filters);
 
         const result = new Set();
         msg.changes.forEach(change => {
@@ -441,7 +470,7 @@ module.exports = function (backlog) {
     void loadDeets();
 
     this.send = msg => {
-        clients.forEach(client => void client.write(compose(msg, getShownProducts(msg, client.filters))));
-        wss.clients.forEach(ws => void ws.ribbit.write(compose(msg, getShownProducts(msg, ws.ribbit.filters))));
+        clients.forEach(client => void client.write(compose(msg, client.filters)));
+        wss.clients.forEach(ws => void ws.ribbit.write(compose(msg, ws.ribbit.filters)));
     };
 };

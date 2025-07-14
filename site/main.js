@@ -265,7 +265,7 @@
             document.title = `(${pendingCount}) ` + document.title.replace(/^\(\d+\)\s*/, '');
             surround.classList.add('pending');
         } else if (location.hash.replace(/^#/, '') === surround.dataset.sequence) {
-            surround.scrollIntoView();
+            window.setTimeout(() => void surround.scrollIntoView(), 250);
         }
 
         // Notifications
