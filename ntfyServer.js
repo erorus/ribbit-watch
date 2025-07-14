@@ -16,13 +16,13 @@ module.exports = function (backlog) {
     /**
      * @typedef {Object} NtfyClient
      * @property {Object} res
-     * @property {string} topic
-     * @property {TopicFilters} filters
+     * @property {TopicFilters[]} filterSets
      * @property {function} write
      */
 
     /**
      * @typedef {Object} TopicFilters
+     * @property {string} topic
      * @property {string} productsFilter
      * @property {RegExp} productsRegex
      * @property {number} flags
@@ -117,6 +117,7 @@ module.exports = function (backlog) {
 
         return {
             'event': 'message',
+            'topic': filters.topic,
             'tags': ['frog'],
             'id': `seq${msg.sequence}`,
             'time': msg.timestamp,
@@ -160,11 +161,11 @@ module.exports = function (backlog) {
         };
 
         const url = new URL(`http://localhost${req.url}`);
-        const match = url.pathname.match(/^\/([-_A-Za-z0-9]+)\/(auth|json|sse)$/);
+        const match = url.pathname.match(/^\/([-_A-Za-z0-9,]+)\/(auth|json|sse)$/);
         if (!match) {
             return abort();
         }
-        const [topic, action] = match.slice(1);
+        const [topicCsv, action] = match.slice(1);
 
         if (action === 'auth') {
             res.writeHead(204);
@@ -173,9 +174,9 @@ module.exports = function (backlog) {
             return;
         }
 
-        let filters;
+        let filterSets = [];
         try {
-            filters = parseTopic(topic);
+            topicCsv.split(',').forEach(topic => filterSets.push(parseTopic(topic)));
         } catch (e) {
             return abort();
         }
@@ -196,13 +197,13 @@ module.exports = function (backlog) {
         };
         res.writeHead(200, headers);
 
-        const write = msg => msg && res.write(encodeNtfyMessage({topic, ...msg}, action));
+        const write = msg => msg && res.write(encodeNtfyMessage(msg, action));
 
         if (!oneShot) {
-            write({'event': 'open'});
+            write({'event': 'open', topic: topicCsv});
         }
 
-        handleSince(since, write, filters);
+        filterSets.forEach(filters => handleSince(since, write, filters));
 
         if (oneShot) {
             res.end();
@@ -210,8 +211,11 @@ module.exports = function (backlog) {
             return;
         }
 
-        const keepaliveInterval = setInterval(() => void write({'event': 'keepalive'}), KEEPALIVE_INTERVAL);
-        clients.push({res, topic, filters, write});
+        const keepaliveInterval = setInterval(
+            () => void write({'event': 'keepalive', topic: topicCsv}),
+            KEEPALIVE_INTERVAL,
+        );
+        clients.push({res, filterSets, write});
         res.on('close', () => {
             clearInterval(keepaliveInterval);
 
@@ -235,31 +239,32 @@ module.exports = function (backlog) {
             ws.on('pong', () => void (ws.isAlive = true));
 
             const url = new URL(`http://localhost${req.url}`);
-            const match = url.pathname.match(/^\/([-_A-Za-z0-9]+)\/ws$/);
+            const match = url.pathname.match(/^\/([-_A-Za-z0-9,]+)\/ws$/);
             if (!match) {
                 ws.close();
                 return;
             }
 
-            const topic = match[1];
-            let filters;
+            const topicCsv = match[1];
+            let filterSets = [];
             try {
-                filters = parseTopic(topic);
+                topicCsv.split(',').forEach(topic => filterSets.push(parseTopic(topic)));
             } catch (e) {
                 ws.close();
                 return;
             }
-            const write = msg => msg && ws.send(encodeNtfyMessage({topic, ...msg}));
-            ws.ribbit = {topic, filters, write};
+
+            const write = msg => msg && ws.send(encodeNtfyMessage(msg));
+            ws.ribbit = {filterSets, write};
 
             const oneShot = getParam(req, ['poll', 'x-poll', 'po']) != null;
             const since = getParam(req, ['since', 'x-since', 'si']);
 
             if (!oneShot) {
-                write({'event': 'open'});
+                write({'event': 'open', topic: topicCsv});
             }
 
-            handleSince(since, write, filters);
+            filterSets.forEach(filters => handleSince(since, write, filters));
 
             if (oneShot) {
                 ws.close();
@@ -363,6 +368,7 @@ module.exports = function (backlog) {
         const productsRegex = getProductsRegex(productsFilter);
 
         return {
+            topic,
             version,
             flags,
             productsFilter,
@@ -470,7 +476,15 @@ module.exports = function (backlog) {
     void loadDeets();
 
     this.send = msg => {
-        clients.forEach(client => void client.write(compose(msg, client.filters)));
-        wss.clients.forEach(ws => void ws.ribbit.write(compose(msg, ws.ribbit.filters)));
+        clients.forEach(
+            client => client.filterSets.forEach(
+                filters => void client.write(compose(msg, filters))
+            )
+        );
+        wss.clients.forEach(
+            ws => ws.ribbit.filterSets.forEach(
+                filters => void ws.ribbit.write(compose(msg, filters))
+            )
+        );
     };
 };
