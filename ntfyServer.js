@@ -240,21 +240,22 @@ module.exports = function (backlog) {
             const [, amount, unit] = match;
             const n = parseInt(amount, 10);
 
+            sinceTimestamp = Date.now();
             switch (unit) {
                 case 'ms':
-                    sinceTimestamp = n;
+                    sinceTimestamp -= n;
                     break;
                 case 's':
-                    sinceTimestamp = n * 1000;
+                    sinceTimestamp -= n * 1000;
                     break;
                 case 'm':
-                    sinceTimestamp = n * 60 * 1000;
+                    sinceTimestamp -= n * 60 * 1000;
                     break;
                 case 'h':
-                    sinceTimestamp = n * 60 * 60 * 1000;
+                    sinceTimestamp -= n * 60 * 60 * 1000;
                     break;
                 case 'd':
-                    sinceTimestamp = n * 24 * 60 * 60 * 1000;
+                    sinceTimestamp -= n * 24 * 60 * 60 * 1000;
                     break;
             }
         } else if (/^\d+$/.test(since)) {
