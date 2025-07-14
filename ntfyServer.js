@@ -73,6 +73,7 @@ module.exports = function (backlog) {
             'tags': ['frog'],
             'id': `seq${msg.sequence}`,
             'time': msg.timestamp,
+            'click': `https://ribbit.watch/#${msg.sequence}`,
             'title': 'Ribbit Watch',
             'message': 'New Ribbit Update for ' +
                 Array.from((new Set(msg.changes.map(change => change.product + (change.file !== 'versions' ? `/${change.file}` : '')))).values())

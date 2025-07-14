@@ -10,7 +10,8 @@ $tempPath = $argv[1];
 foreach (file("{$tempPath}/map.txt") as $line) {
     [$hash, $product] = explode(' ', trim($line), 2);
 
-    $json = file_get_contents("{$tempPath}/{$hash}");
+    $path = "{$tempPath}/{$hash}";
+    $json = file_get_contents($path);
     $parsed = json_decode($json);
     if (json_last_error() !== JSON_ERROR_NONE) {
         fwrite(STDERR, "{$path} was not json\n");
