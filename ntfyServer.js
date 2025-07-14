@@ -1,6 +1,8 @@
 const dateFormat = require('dateformat');
 const { createServer } = require('node:http');
 const { WebSocketServer } = require('ws');
+const fs = require('node:fs');
+const Path = require('node:path');
 
 /**
  * @param {UpdateMessage[]} backlog
@@ -14,11 +16,23 @@ module.exports = function (backlog) {
     /**
      * @typedef {Object} NtfyClient
      * @property {Object} res
+     * @property {string} topic
+     * @property {TopicFilters} filters
      * @property {function} write
+     */
+
+    /**
+     * @typedef {Object} TopicFilters
+     * @property {RegExp} productsRegex
+     * @property {number} flags
+     * @property {number} version
      */
 
     /** @type {NtfyClient[]} */
     const clients = [];
+
+    /** @type {Object<string, Deets>} */
+    let productDeets = {};
 
     /**
      * Prints a message to the log.
@@ -64,9 +78,25 @@ module.exports = function (backlog) {
      * Converts an update message into a ntfy message.
      *
      * @param {UpdateMessage} msg
+     * @param {string[]} products
+     * @returns {Object|undefined}
      */
-    const compose = msg => {
+    const compose = (msg, products) => {
         const padNumbers = str => str.replace(/\d+/g, num => num.padStart(4, '0'));
+
+        const paths = Array.from(
+            (
+                new Set(
+                    msg.changes
+                    .filter(change => products.includes(change.product))
+                    .map(change => change.product + (change.file !== 'versions' ? `/${change.file}` : ''))
+                )
+            ).values()
+        );
+
+        if (!paths.length) {
+            return;
+        }
 
         return {
             'event': 'message',
@@ -75,10 +105,9 @@ module.exports = function (backlog) {
             'time': msg.timestamp,
             'click': `https://ribbit.watch/#${msg.sequence}`,
             'title': 'Ribbit Watch',
-            'message': 'New Ribbit Update for ' +
-                Array.from((new Set(msg.changes.map(change => change.product + (change.file !== 'versions' ? `/${change.file}` : '')))).values())
-                    .sort((a, b) => padNumbers(a).localeCompare(padNumbers(b)))
-                    .join(', '),
+            'message': 'New Ribbit Update for ' + paths
+                .sort((a, b) => padNumbers(a).localeCompare(padNumbers(b)))
+                .join(', '),
         };
     };
 
@@ -108,15 +137,13 @@ module.exports = function (backlog) {
      * @param {Object} res
      */
     const handleHTTPRequest = (req, res) => {
-        logMsg('Incoming ntfy request at ' + req.url);
-
         const abort = () => {
             res.writeHead(404);
             res.end();
         };
 
         const url = new URL(`http://localhost${req.url}`);
-        const match = url.pathname.match(/^\/([^\/,]+)\/([^\/]+)$/);
+        const match = url.pathname.match(/^\/([-_A-Za-z0-9]+)\/(auth|json|sse)$/);
         if (!match) {
             return abort();
         }
@@ -127,6 +154,13 @@ module.exports = function (backlog) {
             res.end();
 
             return;
+        }
+
+        let filters;
+        try {
+            filters = parseTopic(topic);
+        } catch (e) {
+            return abort();
         }
 
         if (!['json', 'sse'].includes(action)) {
@@ -145,13 +179,13 @@ module.exports = function (backlog) {
         };
         res.writeHead(200, headers);
 
-        const write = msg => res.write(encodeNtfyMessage({topic, ...msg}, action));
+        const write = msg => msg && res.write(encodeNtfyMessage({topic, ...msg}, action));
 
         if (!oneShot) {
             write({'event': 'open'});
         }
 
-        handleSince(since, write);
+        handleSince(since, write, filters);
 
         if (oneShot) {
             res.end();
@@ -160,7 +194,7 @@ module.exports = function (backlog) {
         }
 
         const keepaliveInterval = setInterval(() => void write({'event': 'keepalive'}), KEEPALIVE_INTERVAL);
-        clients.push({res, topic, write});
+        clients.push({res, topic, filters, write});
         res.on('close', () => {
             clearInterval(keepaliveInterval);
 
@@ -184,15 +218,22 @@ module.exports = function (backlog) {
             ws.on('pong', () => void (ws.isAlive = true));
 
             const url = new URL(`http://localhost${req.url}`);
-            const match = url.pathname.match(/^\/([^\/,]+)\/ws$/);
+            const match = url.pathname.match(/^\/([-_A-Za-z0-9]+)\/ws$/);
             if (!match) {
                 ws.close();
                 return;
             }
 
             const topic = match[1];
-            const write = msg => ws.send(encodeNtfyMessage({topic, ...msg}));
-            ws.ribbit = {topic, write};
+            let filters;
+            try {
+                filters = parseTopic(topic);
+            } catch (e) {
+                ws.close();
+                return;
+            }
+            const write = msg => msg && ws.send(encodeNtfyMessage({topic, ...msg}));
+            ws.ribbit = {topic, filters, write};
 
             const oneShot = getParam(req, ['poll', 'x-poll', 'po']) != null;
             const since = getParam(req, ['since', 'x-since', 'si']);
@@ -201,7 +242,7 @@ module.exports = function (backlog) {
                 write({'event': 'open'});
             }
 
-            handleSince(since, write);
+            handleSince(since, write, filters);
 
             if (oneShot) {
                 ws.close();
@@ -226,8 +267,9 @@ module.exports = function (backlog) {
      *
      * @param {string|null} since
      * @param {function} write
+     * @param {TopicFilters} filters
      */
-    const handleSince = (since, write) => {
+    const handleSince = (since, write, filters) => {
         if (!backlog.length || since == null || since === 'none') {
             return;
         }
@@ -275,13 +317,131 @@ module.exports = function (backlog) {
                 );
             }
 
-            catchUp.forEach(msg => write(compose(msg)));
+            catchUp.forEach(msg => void write(compose(msg, getShownProducts(msg, filters))));
         }
     };
 
+    /**
+     * Parses a topic string to return the checkbox flags and products regex.
+     *
+     * @param {string} topic
+     * @return {TopicFilters}
+     */
+    const parseTopic = topic => {
+        const match = topic.match(/^([0-9a-f]+)-([-_A-Za-z0-9]*)$/);
+        if (!match) {
+            throw new Error('Pattern not matched.');
+        }
+
+        const packedNum = parseInt(match[1], 16);
+        const version = packedNum & 0xF;
+        if (version !== 0) {
+            throw new Error('Unsupported version.');
+        }
+        const flags = packedNum >> 4;
+        const productsFilter = decodeURIComponent(match[2]
+            .replace(/-/g, '%')
+            .replace(/%%/g, '-')
+            .replace(/(%)?_/g, (match, pct) => pct ? '_' : '%20'));
+        const productsRegex = getProductsRegex(productsFilter);
+
+        return {
+            version,
+            flags,
+            productsRegex,
+        };
+    };
+
+    /**
+     * Returns a regex built from the given products input string.
+     *
+     * @param {string} input
+     * @returns {RegExp}
+     */
+    const getProductsRegex = input => {
+        if (input === '') {
+            return /.*/;
+        }
+
+        let match = /^\/([\w\W]+)\/([iu]*)$/.exec(input);
+        if (match) {
+            return new RegExp(match[1], match[2]);
+        }
+
+        return new RegExp(
+            '^(?:' +
+            Array.from(input.matchAll(/[\w*]+/g)).map(match => '(?:' + match[0].replace(/\*/g, '.*') + ')').join('|') +
+            ')$',
+            'i'
+        );
+    };
+
+    /**
+     * Returns a list of products which would be shown in an alert from the given message, after the given filters.
+     *
+     * @param {UpdateMessage} msg
+     * @param {TopicFilters} filters
+     * @returns {string[]}
+     */
+    const getShownProducts = (msg, filters) => {
+        const encryptedExcluded = filters.flags & 0x1;
+        const fieldFlags = {
+            'BuildConfig'  : 0x2,
+            'CDNConfig'    : 0x4,
+            'KeyRing'      : 0x8,
+            'BuildId'      : 0x10,
+            'VersionsName' : 0x20,
+            'ProductConfig': 0x40,
+            'Path'         : 0x80,
+            'Hosts'        : 0x100,
+            'Servers'      : 0x200,
+            'ConfigPath'   : 0x400,
+        };
+        const deniedFields = Object.entries(fieldFlags)
+            .filter(([field, flag]) => !!(filters.flags & flag))
+            .map(([field, flag]) => field);
+
+        const result = new Set();
+        msg.changes.forEach(change => {
+            if (!filters.productsRegex.test(change.product)) {
+                return;
+            }
+            const isEncrypted = productDeets[change.product]?.key != null;
+            if (isEncrypted && encryptedExcluded) {
+                return;
+            }
+            if (!change.diffs.some(diff => !deniedFields.includes(diff.field))) {
+                return;
+            }
+
+            result.add(change.product);
+        });
+
+        return Array.from(result.values());
+    }
+
+    /**
+     * Loads the deets into the productDeets variable.
+     *
+     * @return {Promise<void>}
+     */
+    const loadDeets = async () => {
+        const path = Path.join(__dirname, 'deets', 'deets.json');
+        try {
+            const json = await fs.promises.readFile(path, {encoding: 'utf8'});
+            productDeets = JSON.parse(json);
+            setTimeout(() => void loadDeets(), 45 * 60 * 1000);
+        } catch (e) {
+            logMsg('Failed to load deets json');
+            logMsg(e);
+            setTimeout(() => void loadDeets(), 60 * 1000);
+        }
+    };
+
+    void loadDeets();
+
     this.send = msg => {
-        const composed = compose(msg);
-        clients.forEach(client => void client.write(composed));
-        wss.clients.forEach(ws => ws.ribbit.write(composed));
+        clients.forEach(client => void client.write(compose(msg, getShownProducts(msg, client.filters))));
+        wss.clients.forEach(ws => void ws.ribbit.write(compose(msg, getShownProducts(msg, ws.ribbit.filters))));
     };
 };
