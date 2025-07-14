@@ -1,17 +1,19 @@
 const dateFormat = require('dateformat');
 const { createServer } = require('node:http');
+const WebSocketServer = require('ws');
 
 /**
  * @param {UpdateMessage[]} backlog
  */
 module.exports = function (backlog) {
-    const NTFY_PORT = 8003;
-    const KEEPALIVE_INTERVAL = 25000;
+    const HTTP_PORT = 8003;
+    const WSS_PORT = 8004;
+    const KEEPALIVE_INTERVAL = 45000;
 
     /**
      * @typedef {Object} NtfyClient
-     * @property {ServerResponse} res
-     * @property {string} topic
+     * @property {Object} res
+     * @property {function} write
      */
 
     /** @type {NtfyClient[]} */
@@ -31,9 +33,10 @@ module.exports = function (backlog) {
      * Ensures we have the required properties on a Ntfy message, then returns it as a json string.
      *
      * @param {Object} msg
+     * @param {string} action
      * @return {string}
      */
-    const encodeNtfyMessage = msg => {
+    const encodeNtfyMessage = (msg, action) => {
         msg.id ??= [...Array(12)].map(() =>
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
                 .charAt(Math.floor(Math.random() * 62))
@@ -44,7 +47,16 @@ module.exports = function (backlog) {
             msg.time = Math.floor(msg.time / 1000);
         }
 
-        return JSON.stringify(msg) + '\n';
+        let result = JSON.stringify(msg) + '\n';
+
+        if (action === 'sse') {
+            result = `data: ${result}\n`;
+            if (msg.event !== 'message') {
+                result = `event: ${msg.event}\n${result}`;
+            }
+        }
+
+        return result;
     };
 
     /**
@@ -93,7 +105,7 @@ module.exports = function (backlog) {
      * @param {Object} req
      * @param {Object} res
      */
-    const handleRequest = (req, res) => {
+    const handleHTTPRequest = (req, res) => {
         logMsg('Incoming ntfy request at ' + req.url);
 
         const abort = () => {
@@ -102,13 +114,20 @@ module.exports = function (backlog) {
         };
 
         const url = new URL(`http://localhost${req.url}`);
-        const match = url.pathname.match(/^\/([^\/]+)\/([^\/]+)$/);
+        const match = url.pathname.match(/^\/([^\/,]+)\/([^\/]+)$/);
         if (!match) {
             return abort();
         }
         const [topic, action] = match.slice(1);
 
-        if (action !== 'json') {
+        if (action === 'auth') {
+            res.writeHead(204);
+            res.end();
+
+            return;
+        }
+
+        if (!['json', 'sse'].includes(action)) {
             return abort();
         }
 
@@ -116,13 +135,18 @@ module.exports = function (backlog) {
         const since = getParam(req, ['since', 'x-since', 'si']);
 
         const headers = {
-            'Content-Type': 'application/x-ndjson; charset=utf-8',
+            'Content-Type': ({
+                'json': 'application/x-ndjson; charset=utf-8',
+                'sse': 'text/event-stream; charset=utf-8',
+            })[action],
             'Cache-Control': 'no-cache',
         };
         res.writeHead(200, headers);
 
+        const write = msg => res.write(encodeNtfyMessage({topic, ...msg}, action));
+
         if (!oneShot) {
-            res.write(encodeNtfyMessage({'event': 'open', topic}));
+            write({'event': 'open'});
         }
 
         // print old messages
@@ -168,7 +192,7 @@ module.exports = function (backlog) {
                     );
                 }
 
-                catchUp.forEach(msg => res.write(encodeNtfyMessage({topic, ...compose(msg)})));
+                catchUp.forEach(msg => write(compose(msg)));
             }
         }
 
@@ -178,11 +202,8 @@ module.exports = function (backlog) {
             return;
         }
 
-        const keepaliveInterval = setInterval(
-            () => void res.write(encodeNtfyMessage({'event': 'keepalive', topic})),
-            KEEPALIVE_INTERVAL,
-        );
-        clients.push({res, topic});
+        const keepaliveInterval = setInterval(() => void write({'event': 'keepalive'}), KEEPALIVE_INTERVAL);
+        clients.push({res, write});
         res.on('close', () => {
             clearInterval(keepaliveInterval);
 
@@ -194,12 +215,12 @@ module.exports = function (backlog) {
     };
 
     {
-        const server = createServer(handleRequest);
-        server.listen(NTFY_PORT, undefined, () => logMsg(`Ntfy.sh server started on port ${NTFY_PORT}.`));
+        const server = createServer(handleHTTPRequest);
+        server.listen(HTTP_PORT, undefined, () => logMsg(`Ntfy.sh HTTP server started on port ${HTTP_PORT}.`));
     }
 
     this.send = msg => {
         const composed = compose(msg);
-        clients.forEach(client => client.res.write(encodeNtfyMessage({...composed, topic: client.topic})));
+        clients.forEach(client => void client.write(composed));
     };
 };

@@ -7,6 +7,7 @@ const gitDir = Path.join(__dirname, 'current', '.git');
 
 const git = new (require('./git'))(gitDir);
 const ribbitVersions = require('./ribbitVersions');
+const ntfyServer = require('./ntfyServer');
 
 const BACKLOG_COMMITS = 50;
 const SSE_PORT = 8002;
@@ -168,7 +169,7 @@ function startSSEServer(backlog) {
 
     const server = createServer((req, res) => {
         const headers = {
-            'Content-Type': 'text/event-stream',
+            'Content-Type': 'text/event-stream; charset=utf-8',
             'Cache-Control': 'no-cache',
             'Connection': 'keep-alive',
         };
@@ -207,6 +208,7 @@ async function main() {
     sortBacklog();
 
     const sseSend = startSSEServer(backlog);
+    const ntfy = new ntfyServer(backlog);
 
     const handleNewCommit = async (commit) => {
         logMsg(`Detected new commit: ${commit}`);
@@ -226,6 +228,7 @@ async function main() {
 
         logMsg(msg);
         sseSend(msg);
+        ntfy.send(msg);
     };
 
     setupWatcher(handleNewCommit);
