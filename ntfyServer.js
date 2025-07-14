@@ -10,7 +10,7 @@ const Path = require('node:path');
 module.exports = function (backlog) {
     const HTTP_PORT = 8003;
     const WS_PORT = 8004;
-    const LISTEN_HOST = undefined;
+    const LISTEN_HOST = '127.0.0.1';
     const KEEPALIVE_INTERVAL = 45000;
 
     /**
