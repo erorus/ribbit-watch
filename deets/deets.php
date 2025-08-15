@@ -46,7 +46,7 @@ foreach (file("{$tempPath}/map.txt") as $line) {
 
 foreach ($configPaths as $product => $path) {
     if (!isset($results[$product])) {
-        $results[$product] = ['configPath' => $path];
+        $results[$product] = ['configPath' => $path, 'noProductConfig' => true];
     }
 }
 
