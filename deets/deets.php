@@ -5,12 +5,32 @@ $results = [];
 $configPaths = json_decode(file_get_contents(__DIR__ . '/configPaths.json'), true);
 unset($configPaths['-']);
 
+foreach ($configPaths as $product => $path) {
+    $results[$product] = ['configPath' => $path];
+}
+
 $hashMap = [];
 $tempPath = $argv[1];
 foreach (file("{$tempPath}/map.txt") as $line) {
-    [$hash, $product] = explode(' ', trim($line), 2);
+    [$hash, $product, $type] = explode(' ', trim($line), 3);
 
     $path = "{$tempPath}/{$hash}";
+    if (!file_exists($path)) {
+        fwrite(STDERR, "Path [{$path}] for product [{$product}] does not exist.\n");
+        continue;
+    }
+    if ($type === "BuildConfig") {
+        // We couldn't get a product config, but we'll read a build config to see if it's encrypted.
+        if (md5_file($path, true) !== hex2bin($hash)) {
+            $results[$product]['encrypted'] = true;
+        }
+        continue;
+    }
+    if ($type !== "ProductConfig") {
+        fwrite(STDERR, "Unknown map line type [{$type}] for product [{$product}]\n");
+        continue;
+    }
+
     $json = file_get_contents($path);
     $parsed = json_decode($json);
     if (json_last_error() !== JSON_ERROR_NONE) {
@@ -20,10 +40,8 @@ foreach (file("{$tempPath}/map.txt") as $line) {
 
     $result = [];
 
-    if (isset($configPaths[$product])) {
-        $result['configPath'] = $configPaths[$product];
-    }
     if (isset($parsed->all->config->decryption_key_name)) {
+        $result['encrypted'] = true;
         $result['key'] = $parsed->all->config->decryption_key_name;
     }
     if (isset($parsed->all->config->form->game_dir->dirname)) {
@@ -41,13 +59,7 @@ foreach (file("{$tempPath}/map.txt") as $line) {
         unset($result['name']);
     }
 
-    $results[$product] = $result;
-}
-
-foreach ($configPaths as $product => $path) {
-    if (!isset($results[$product])) {
-        $results[$product] = ['configPath' => $path, 'noProductConfig' => true];
-    }
+    $results[$product] = [...($results[$product] ?? []), ...$result];
 }
 
 ksort($results);
