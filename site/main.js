@@ -1,9 +1,10 @@
 (function () {
     /**
      * @typedef {Object} Deets
-     * @property {string} configPath The Blizzard CDN path fragment used by build configs, cdn configs, etc.
-     * @property {string} key        The encryption key name used by this product.
-     * @property {string} name       A user-facing name for this product.
+     * @property {string}  configPath The Blizzard CDN path fragment used by build configs, cdn configs, etc.
+     * @property {boolean} encrypted  Whether this product's data is encrypted.
+     * @property {string}  key        The encryption key name used by this product.
+     * @property {string}  name       A user-facing name for this product.
      */
 
     /** @type {string} Blizzard's CDN host we use to link to various configs. */
@@ -195,10 +196,10 @@
             if (deets?.name) {
                 qs('.update-row-product-product').title = deets.name;
             }
-            if (deets?.key) {
+            if (deets?.encrypted || deets?.key) {
                 qs('.update-row-product-lock').textContent = '🔒';
-                qs('.update-row-product-lock').title = `Encrypted: ${deets.key}`;
-                qs('.update-row').dataset.encrypted = deets.key;
+                qs('.update-row-product-lock').title = deets.key ? `Encrypted: ${deets.key}` : 'Encrypted';
+                qs('.update-row').dataset.encrypted = 'true';
             }
             qs('.update-row-product-file').textContent = change.file !== 'versions' ? `/${change.file}` : '';
             qs('.update-row-product').dataset.first = `${change.product}|${change.file}`;
