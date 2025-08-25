@@ -441,7 +441,8 @@ module.exports = function (backlog) {
             if (!filters.productsRegex.test(change.product)) {
                 return;
             }
-            const isEncrypted = productDeets[change.product]?.key != null;
+            const deets = productDeets[change.product];
+            const isEncrypted = deets?.encrypted || deets?.key != null;
             if (isEncrypted && encryptedExcluded) {
                 return;
             }
