@@ -140,7 +140,7 @@
      */
     function logChanges(updateMessage) {
         const listParent = qs('#updates-list-parent');
-        if (qs(`#updates-list-parent .updates-list-container[data-sequence="${updateMessage.sequence}"]`)) {
+        if (qs(`#updates-list-parent .updates-list-container[data-commit="${updateMessage.commitHash}"]`)) {
             return;
         }
 
@@ -220,7 +220,11 @@
 
         const surround = ce('div', {
             className: 'updates-list-container',
-            dataset: {sequence: `${updateMessage.sequence}`},
+            dataset: {
+                commit: `${updateMessage.commitHash}`,
+                timestamp: `${updateMessage.timestamp}`,
+                sequence: `${updateMessage.sequence}`,
+            },
         });
         // Add the header to the surround.
         {
@@ -245,12 +249,12 @@
 
         // Add surround to parent and sort surrounds.
         listParent.insertBefore(surround, listParent.firstChild);
-        const surroundSequences = Array.from(listParent.querySelectorAll(':scope > .updates-list-container'))
-            .map(surround => parseInt(surround.dataset.sequence));
-        const sortedSequences = surroundSequences.slice().sort((a, b) => b - a);
-        if (JSON.stringify(surroundSequences) !== JSON.stringify(sortedSequences)) {
-            sortedSequences.forEach(sequence => listParent.appendChild(listParent.querySelector(
-                `:scope > .updates-list-container[data-sequence="${sequence}"]`
+        const surroundTimestamps = Array.from(listParent.querySelectorAll(':scope > .updates-list-container'))
+            .map(surround => parseInt(surround.dataset.timestamp));
+        const sortedTimestamps = surroundTimestamps.slice().sort((a, b) => b - a);
+        if (JSON.stringify(surroundTimestamps) !== JSON.stringify(sortedTimestamps)) {
+            sortedTimestamps.forEach(timestamp => listParent.appendChild(listParent.querySelector(
+                `:scope > .updates-list-container[data-timestamp="${timestamp}"]`
             )));
         }
         while (listParent.children.length > MAX_UPDATES) {
