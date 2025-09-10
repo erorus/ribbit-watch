@@ -162,6 +162,10 @@ module.exports = new function () {
      * @returns {string}
      */
     function getMimePart(multipart, disposition) {
+        if (!/^Mime-Version: 1\.0\s*$/mi.test(multipart)) {
+            return multipart;
+        }
+
         const boundaryMatch = multipart.match(/boundary="([-0-9a-f]+)"/);
         if (!boundaryMatch) {
             throw new Error('Boundary not found in multipart header');
