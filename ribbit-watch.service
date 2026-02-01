@@ -1,0 +1,12 @@
+[Unit]
+Description=Hosts the ribbit-watch websocket service
+
+[Service]
+ExecStart=/usr/bin/node /var/www/ribbit-watch/main.js
+WorkingDirectory=/var/www/ribbit-watch
+Restart=always
+RestartSec=15s
+
+[Install]
+WantedBy=multi-user.target
+
