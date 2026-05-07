@@ -112,7 +112,7 @@ module.exports = function (backlog) {
             params.set('encrypted', 'no');
         }
 
-        const click = new URL(`https://ribbit.watch/#${msg.sequence}`);
+        const click = new URL(`https://ribbit-watch.everynothing.net/#${msg.sequence}`);
         click.search = params.toString();
 
         return {

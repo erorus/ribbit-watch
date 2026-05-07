@@ -552,7 +552,7 @@
 
             prompt([
                 'You can get notifications on your phone by installing the ntfy app.',
-                'Once installed, subscribe to a topic. Check "Use another server" and put in https://ntfy.ribbit.watch',
+                'Once installed, subscribe to a topic. Check "Use another server" and put in https://ribbit-ntfy.everynothing.net',
                 'Then, for the topic name, enter the text below:'
             ].join('\n\n'), topic);
         });

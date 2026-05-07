@@ -1,12 +1,12 @@
 # Ribbit Watch
 
-This is a [website and notification service](https://ribbit.watch) which monitors a [Git repository](https://github.com/erorus-everynothing/ribbit) which [tracks](https://github.com/erorus/ribbit.sh) Blizzard's Ribbit server, and formats those updates in a timely and user-friendly way.
+This is a [website and notification service](https://ribbit-watch.everynothing.net) which monitors a [Git repository](https://github.com/erorus-everynothing/ribbit) which [tracks](https://github.com/erorus/ribbit.sh) Blizzard's Ribbit server, and formats those updates in a timely and user-friendly way.
 
 There are a lot of little bits and pieces to this setup, so there are no install instructions per se, though this README will attempt to describe all those pieces and what they do.
 
 ## General Flow
 
-1. A user has [the website](https://ribbit.watch) open in their browser. Their browser maintains a websocket connection, through our nginx server, to our `main.js` script which is running as a systemd daemon.
+1. A user has [the website](https://ribbit-watch.everynothing.net) open in their browser. Their browser maintains a websocket connection, through our nginx server, to our `main.js` script which is running as a systemd daemon.
 2. [ribbit.sh](https://github.com/erorus/ribbit.sh), running separately, detects an update on Blizzard's servers, and commits the update to a local Git repository.
 3. That repo has a post-commit hook which touches `last-commit-time` in our directory.
 4. Our `main.js` is watching that file for any changes. It detects the updated timestamp, and that triggers it to examine the local git repo for the latest commit.
